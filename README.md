@@ -47,14 +47,96 @@ MediaPickerKMP is a unified, lifecycle-safe media and file picker for **Android*
 
 ---
 
+## End-to-End Performance & Execution Flow
+
+Below is the complete execution pipeline showing how MediaPickerKMP processes any media request from the UI down to native system APIs and back:
+
+```
+[ User UI / Composable ]
+          │
+          │ 1. Calls picker.pickImage() / capturePhoto()
+          ▼
+[ MediaPickerState / DefaultMediaPicker ]
+          │
+          │ 2. Single-Flight Mutex: Blocks overlapping concurrent calls
+          ▼
+[ MediaPickerRepositoryImpl ]
+          │
+          │ 3. Delegates to Platform Bridge
+          ▼
+[ PlatformMediaPickerBridge (expect / actual) ]
+          │
+          ├────────────────────────┬────────────────────────┐
+          ▼                        ▼                        ▼
+  [ Android ActivityResult ]   [ iOS PHPicker ]   [ iOS Camera / Document ]
+          │                        │                        │
+          │ User picks / captures  │ User picks in Photos   │ User captures / selects
+          ▼                        ▼                        ▼
+  [ Android Content URI ]      [ iOS PHPickerResult ]   [ iOS NSURL / File ]
+          │                        │                        │
+          └────────────────────────┴────────────────────────┘
+                                   │
+                                   │ 4. Platform Metadata Extraction & Caching
+                                   ▼
+                   [ Android / iOS Metadata Extractor ]
+                     - Filename sanitization (Path traversal defense)
+                     - Fixed 8 KB buffer streaming to cache (OOM safe)
+                     - Duration, dimensions, MIME type, file size extraction
+                                   │
+                                   │ 5. Returns validated MediaPickerItem
+                                   ▼
+                   [ Repository Validation Layer ]
+                     - Max file size check
+                     - MIME type filtering & normalization
+                                   │
+                                   │ 6. Emits MediaPickerResult.Success
+                                   ▼
+                   [ Compose UI Recomposition ]
+```
+
+### Key Performance Guarantees
+
+1. **Single-Flight Operation Mutex**: If a user double-taps or triggers multiple picker actions simultaneously, `DefaultMediaPicker` guards execution using a coroutine `Mutex`. Extra concurrent calls are immediately rejected with `MediaPickerError.OperationFailed` rather than causing corrupt state or duplicate dialogs.
+2. **Zero-OOM File Streaming**: Files are copied from system `ContentResolver` or iOS `NSURL` using a fixed 8 KB buffer. Memory usage remains constant (~8 KB) even when copying 4K videos or gigabyte-sized audio files.
+3. **Path Traversal Protection**: All filenames returned by external content providers are sanitized through `AndroidMetadataExtractor.sanitizeFileName()`. Traversal elements (`../`, `..\`), path separators, and illegal characters are stripped, and canonical target paths are strictly verified to remain within app-private cache boundaries.
+
+---
+
 ## Architecture Overview
 
-MediaPickerKMP is built according to Clean Architecture principles:
+MediaPickerKMP adheres to Clean Architecture and MVVM principles across Kotlin Multiplatform targets:
 
-- **Domain Layer (`commonMain`)**: Defines `MediaPicker`, `MediaPickerConfig`, `MediaPickerResult`, and `MediaPickerItem`. Free of platform dependencies.
-- **Data Layer (`commonMain`)**: `DefaultMediaPicker` enforces concurrency rules using coroutine mutexes.
-- **Platform Bridges (`androidMain` / `iosMain`)**: Native delegates handle Activity results, UIViewController presentation, and metadata extraction.
-- **Compose Layer (`:media-picker-compose`)**: Provides declarative hooks and reactive Material 3 UI widgets.
+```
++----------------------------------------------------------------+
+|                   Presentation Layer                           |
+|  - :media-picker-compose (Composable functions, BottomSheets)  |
+|  - MediaPickerState / MediaPickerUiState                       |
++----------------------------------------------------------------+
+                               │
+                               ▼
++----------------------------------------------------------------+
+|                     Domain Layer (Core)                        |
+|  - MediaPicker (Interface)                                     |
+|  - MediaPickerConfig & MediaPickerResult & MediaPickerItem     |
+|  - DefaultMediaPicker (Single-Flight Mutex Protection)         |
++----------------------------------------------------------------+
+                               │
+                               ▼
++----------------------------------------------------------------+
+|                      Data Layer                                |
+|  - MediaPickerRepository & MediaPickerRepositoryImpl           |
+|  - PlatformMediaPickerBridge (expect/actual)                   |
++----------------------------------------------------------------+
+             │                                    │
+             ▼                                    ▼
++─────────────────────────────+     +─────────────────────────────+
+|    Android Platform Main    |     |      iOS Platform Main      |
+| - AndroidMediaPickerBridge  |     | - IOSMediaPickerBridge      |
+| - ActivityResultLauncher    |     | - IOSViewControllerPresenter|
+| - AndroidMetadataExtractor  |     | - PHPickerViewController    |
+| - FileProvider / SAF        |     | - UIDocumentPicker / UIImage|
++─────────────────────────────+     +─────────────────────────────+
+```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architectural details.
 

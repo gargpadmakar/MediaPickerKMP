@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.padmakargarg.mediapicker.compose.MediaPickerUiState
@@ -30,7 +32,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
-            MaterialTheme {
+            MaterialTheme(
+                colorScheme = lightColorScheme(
+                    primary = MaterialTheme.colorScheme.primary,
+                    secondary = MaterialTheme.colorScheme.secondary,
+                    surface = MaterialTheme.colorScheme.surface
+                )
+            ) {
                 val state = rememberMediaPickerState()
                 var showBottomSheet by remember { mutableStateOf(false) }
                 var showDialog by remember { mutableStateOf(false) }
@@ -40,7 +48,7 @@ class MainActivity : ComponentActivity() {
                         MediaPickerActionItem(
                             id = "camera",
                             title = "Capture Photo",
-                            subtitle = "Take a new photo with camera"
+                            subtitle = "Take a high-res photo using camera"
                         ) { state.capturePhoto(MediaPickerConfig.single()) },
                         MediaPickerActionItem(
                             id = "single_image",
@@ -70,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         MediaPickerActionItem(
                             id = "multiple_audio",
                             title = "Pick Multiple Audio",
-                            subtitle = "Select up to 5 audio files"
+                            subtitle = "Select up to 5 audio tracks"
                         ) { state.pickMultipleAudio(MediaPickerConfig.multiple(maxSelection = 5, copyToCache = true)) },
                         MediaPickerActionItem(
                             id = "single_file",
@@ -94,28 +102,40 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
                         Surface(
-                            shadowElevation = 4.dp,
-                            color = MaterialTheme.colorScheme.primary
+                            shadowElevation = 3.dp,
+                            color = MaterialTheme.colorScheme.primaryContainer
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .statusBarsPadding()
-                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                    .padding(horizontal = 20.dp, vertical = 14.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = "MediaPickerKMP Sample",
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                Column {
+                                    Text(
+                                        text = "MediaPickerKMP",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Text(
+                                        text = "Kotlin Multiplatform Media Library",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f)
+                                    )
+                                }
                                 SuggestionChip(
                                     onClick = {},
-                                    label = { Text(state.mediaPicker.platformName) },
+                                    label = {
+                                        Text(
+                                            text = state.mediaPicker.platformName,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    },
                                     colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.2f),
+                                        containerColor = MaterialTheme.colorScheme.primary,
                                         labelColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 )
@@ -127,25 +147,31 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(innerPadding)
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                            .padding(horizontal = 16.dp),
+                        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         // Progress Indicator
                         if (state.isLoading) {
                             item {
-                                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
 
-                        // Status Banner
+                        // State & Status Banner
                         item {
                             StatusCard(uiState = state.uiState, onClear = { state.clear() })
                         }
 
-                        // Launcher Modals
+                        // Compose Prebuilt Modals
                         item {
                             Text(
-                                text = "Compose Multiplatform Components",
+                                text = "Prebuilt UI Components",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -154,27 +180,31 @@ class MainActivity : ComponentActivity() {
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Button(
                                     onClick = { showBottomSheet = true },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp)
                                 ) {
-                                    Text("Open Bottom Sheet")
+                                    Text("Bottom Sheet", maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 OutlinedButton(
                                     onClick = { showDialog = true },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp)
                                 ) {
-                                    Text("Open Dialog")
+                                    Text("Dialog Picker", maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
                         }
 
-                        // Quick Action Buttons
+                        // Direct Launch Actions (2-column layout to prevent text wrapping)
                         item {
                             Text(
-                                text = "Quick Triggers",
+                                text = "Direct Picker Actions",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
@@ -183,25 +213,21 @@ class MainActivity : ComponentActivity() {
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Button(
+                                FilledTonalButton(
                                     onClick = { state.capturePhoto() },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Camera")
+                                    Text("Camera", maxLines = 1)
                                 }
-                                Button(
+                                FilledTonalButton(
                                     onClick = { state.pickImage() },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Image")
-                                }
-                                Button(
-                                    onClick = { state.pickMultipleImages(MediaPickerConfig.multiple(5)) },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Images (5)")
+                                    Text("Image (1)", maxLines = 1)
                                 }
                             }
                         }
@@ -209,30 +235,74 @@ class MainActivity : ComponentActivity() {
                         item {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Button(
+                                FilledTonalButton(
+                                    onClick = { state.pickMultipleImages(MediaPickerConfig.multiple(5)) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Images (Max 5)", maxLines = 1)
+                                }
+                                FilledTonalButton(
                                     onClick = { state.pickVideo() },
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Video")
-                                }
-                                Button(
-                                    onClick = { state.pickAudio() },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Audio")
-                                }
-                                Button(
-                                    onClick = { state.pickFile() },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Text("Document")
+                                    Text("Video (1)", maxLines = 1)
                                 }
                             }
                         }
 
-                        // Selected Media Items
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { state.pickAudio() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Audio (1)", maxLines = 1)
+                                }
+                                FilledTonalButton(
+                                    onClick = { state.pickMultipleAudio(MediaPickerConfig.multiple(5)) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Audio (Max 5)", maxLines = 1)
+                                }
+                            }
+                        }
+
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = { state.pickFile() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Document (1)", maxLines = 1)
+                                }
+                                FilledTonalButton(
+                                    onClick = { state.pickMultipleFiles(MediaPickerConfig.multiple(5)) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Documents (5)", maxLines = 1)
+                                }
+                            }
+                        }
+
+                        // Selected Media Items Section
+                        item {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        }
+
                         item {
                             SelectedMediaList(
                                 items = state.items,
@@ -270,49 +340,67 @@ fun StatusCard(
     uiState: MediaPickerUiState,
     onClear: () -> Unit
 ) {
-    Card(
+    val containerColor = when (uiState) {
+        is MediaPickerUiState.Idle -> MaterialTheme.colorScheme.surfaceVariant
+        is MediaPickerUiState.Loading -> MaterialTheme.colorScheme.primaryContainer
+        is MediaPickerUiState.Success -> MaterialTheme.colorScheme.secondaryContainer
+        is MediaPickerUiState.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer
+        is MediaPickerUiState.Error -> MaterialTheme.colorScheme.errorContainer
+    }
+
+    val contentColor = when (uiState) {
+        is MediaPickerUiState.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
+        is MediaPickerUiState.Loading -> MaterialTheme.colorScheme.onPrimaryContainer
+        is MediaPickerUiState.Success -> MaterialTheme.colorScheme.onSecondaryContainer
+        is MediaPickerUiState.Cancelled -> MaterialTheme.colorScheme.onTertiaryContainer
+        is MediaPickerUiState.Error -> MaterialTheme.colorScheme.onErrorContainer
+    }
+
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = when (uiState) {
-                is MediaPickerUiState.Idle -> MaterialTheme.colorScheme.surfaceVariant
-                is MediaPickerUiState.Loading -> MaterialTheme.colorScheme.primaryContainer
-                is MediaPickerUiState.Success -> MaterialTheme.colorScheme.secondaryContainer
-                is MediaPickerUiState.Cancelled -> MaterialTheme.colorScheme.tertiaryContainer
-                is MediaPickerUiState.Error -> MaterialTheme.colorScheme.errorContainer
-            }
-        )
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = containerColor,
+            contentColor = contentColor
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "State: ${uiState::class.simpleName ?: "Idle"}",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = contentColor
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 val description = when (uiState) {
                     is MediaPickerUiState.Idle -> "Ready. Select a media source below."
-                    is MediaPickerUiState.Loading -> "Media picker active..."
+                    is MediaPickerUiState.Loading -> "Media picker is active..."
                     is MediaPickerUiState.Success -> "Successfully selected ${uiState.items.size} item(s)."
-                    is MediaPickerUiState.Cancelled -> "Picker operation cancelled by user."
+                    is MediaPickerUiState.Cancelled -> "Picker operation was cancelled."
                     is MediaPickerUiState.Error -> "Error: ${uiState.error.message}"
                 }
                 Text(
                     text = description,
-                    style = MaterialTheme.typography.bodySmall
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = contentColor.copy(alpha = 0.9f)
                 )
             }
 
             if (uiState !is MediaPickerUiState.Idle && uiState !is MediaPickerUiState.Loading) {
-                TextButton(onClick = onClear) {
-                    Text("Clear")
+                OutlinedButton(
+                    onClick = onClear,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, contentColor.copy(alpha = 0.5f))
+                ) {
+                    Text("Clear", color = contentColor)
                 }
             }
         }
