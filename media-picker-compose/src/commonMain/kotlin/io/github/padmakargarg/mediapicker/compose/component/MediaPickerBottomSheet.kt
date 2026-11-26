@@ -40,10 +40,11 @@ fun MediaPickerBottomSheet(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            LazyColumn(
+            Column(
+                modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                items(actions, key = { it.id }) { action ->
+                actions.forEach { action ->
                     ListItem(
                         headlineContent = {
                             Text(
