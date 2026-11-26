@@ -30,15 +30,7 @@ class IOSViewControllerPresenter(
     private fun findActiveRootViewController(): UIViewController? {
         val application = UIApplication.sharedApplication
 
-        // 1. Check keyWindow
-        application.keyWindow?.rootViewController?.let { return it }
-
-        // 2. Check windows list
-        val window = application.windows.filterIsInstance<UIWindow>().firstOrNull { it.isKeyWindow() }
-            ?: application.windows.filterIsInstance<UIWindow>().firstOrNull()
-        window?.rootViewController?.let { return it }
-
-        // 3. Check connected scenes for iOS 13+
+        // 1. Check connected window scenes for active foreground window (iOS 13+)
         val activeScene = application.connectedScenes
             .filterIsInstance<UIWindowScene>()
             .firstOrNull { it.activationState == UISceneActivationStateForegroundActive }
@@ -47,7 +39,15 @@ class IOSViewControllerPresenter(
         val sceneWindow = activeScene?.windows?.filterIsInstance<UIWindow>()?.firstOrNull { it.isKeyWindow() }
             ?: activeScene?.windows?.filterIsInstance<UIWindow>()?.firstOrNull()
 
-        return sceneWindow?.rootViewController
+        sceneWindow?.rootViewController?.let { return it }
+
+        // 2. Check application windows
+        val window = application.windows.filterIsInstance<UIWindow>().firstOrNull { it.isKeyWindow() }
+            ?: application.windows.filterIsInstance<UIWindow>().firstOrNull()
+        window?.rootViewController?.let { return it }
+
+        // 3. Fallback to keyWindow
+        return application.keyWindow?.rootViewController
     }
 
     private fun findTop(controller: UIViewController): UIViewController {
@@ -61,11 +61,16 @@ class IOSViewControllerPresenter(
     fun present(
         controller: UIViewController,
         animated: Boolean = true,
+        onFailure: (() -> Unit)? = null,
         completion: (() -> Unit)? = null
     ) {
         dispatch_async(dispatch_get_main_queue()) {
             val top = getTopViewController()
-            top?.presentViewController(controller, animated = animated, completion = completion)
+            if (top != null) {
+                top.presentViewController(controller, animated = animated, completion = completion)
+            } else {
+                onFailure?.invoke()
+            }
         }
     }
 

@@ -25,7 +25,8 @@ import kotlin.coroutines.resume
 class IOSPhotoPickerDelegate(
     private val continuation: CancellableContinuation<MediaPickerResult>,
     private val config: MediaPickerConfig,
-    private val defaultMediaType: MediaType = MediaType.UNKNOWN
+    private val defaultMediaType: MediaType = MediaType.UNKNOWN,
+    private val onComplete: () -> Unit = {}
 ) : NSObject(), PHPickerViewControllerDelegateProtocol {
 
     private val lock = NSLock()
@@ -36,6 +37,7 @@ class IOSPhotoPickerDelegate(
 
         val results = didFinishPicking.filterIsInstance<PHPickerResult>()
         if (results.isEmpty()) {
+            onComplete()
             if (continuation.isActive) {
                 continuation.resume(MediaPickerResult.Cancelled)
             }
@@ -64,11 +66,14 @@ class IOSPhotoPickerDelegate(
                     }
                     remainingCount--
 
-                    if (remainingCount == 0 && continuation.isActive) {
-                        if (collectedItems.isNotEmpty()) {
-                            continuation.resume(MediaPickerResult.Success(collectedItems.toList()))
-                        } else {
-                            continuation.resume(MediaPickerResult.Cancelled)
+                    if (remainingCount == 0) {
+                        onComplete()
+                        if (continuation.isActive) {
+                            if (collectedItems.isNotEmpty()) {
+                                continuation.resume(MediaPickerResult.Success(collectedItems.toList()))
+                            } else {
+                                continuation.resume(MediaPickerResult.Cancelled)
+                            }
                         }
                     }
                 } finally {

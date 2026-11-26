@@ -7,21 +7,27 @@ import io.github.padmakargarg.mediapicker.domain.model.MediaPickerResult
 import io.github.padmakargarg.mediapicker.domain.model.MediaType
 import io.github.padmakargarg.mediapicker.util.IOSMetadataExtractor
 import kotlinx.coroutines.suspendCancellableCoroutine
+import platform.AVFoundation.*
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
 import platform.PhotosUI.PHPickerViewController
 import platform.UIKit.UIDocumentPickerViewController
+import platform.UIKit.UIImagePickerController
+import platform.UIKit.UIImagePickerControllerSourceType
 import platform.UIKit.UIViewController
 import kotlin.coroutines.resume
 
 /**
- * iOS platform bridge connecting domain operations to native PHPicker and UIDocumentPicker.
+ * iOS platform bridge connecting domain operations to native PHPicker, UIDocumentPicker and Camera.
  */
 class IOSMediaPickerBridge(
     initialViewController: UIViewController? = null
 ) : PlatformMediaPickerBridge {
 
     private val presenter = IOSViewControllerPresenter(initialViewController)
+    private var activePhotoDelegate: IOSPhotoPickerDelegate? = null
+    private var activeDocumentDelegate: IOSDocumentPickerDelegate? = null
+    private var activeCameraDelegate: IOSCameraCaptureDelegate? = null
 
     fun bind(viewController: UIViewController) {
         presenter.bind(viewController)
@@ -81,29 +87,100 @@ class IOSMediaPickerBridge(
     }
 
     override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult {
-        return launchDocumentPicker(config, allowMultiple = false)
+        return launchDocumentPicker(config, allowMultiple = false, defaultMediaType = MediaType.DOCUMENT)
     }
 
     override suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult {
-        return launchDocumentPicker(config, allowMultiple = true)
+        return launchDocumentPicker(config, allowMultiple = true, defaultMediaType = MediaType.DOCUMENT)
     }
 
     override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult {
-        return MediaPickerResult.Error(
-            MediaPickerError.OperationFailed(message = "iOS Camera Capture will be implemented in Phase 6.")
+        val isCameraAvailable = UIImagePickerController.isSourceTypeAvailable(
+            UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
         )
+        if (!isCameraAvailable) {
+            return MediaPickerResult.Error(
+                MediaPickerError.CameraUnavailable("Camera hardware is not available on this device.")
+            )
+        }
+
+        val authStatus = AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)
+        when (authStatus) {
+            AVAuthorizationStatusRestricted -> {
+                return MediaPickerResult.Error(
+                    MediaPickerError.PermissionDenied("Camera access is restricted on this device.")
+                )
+            }
+            AVAuthorizationStatusDenied -> {
+                return MediaPickerResult.Error(
+                    MediaPickerError.PermissionDenied("Camera permission was denied. Please grant camera permission in iOS Settings.")
+                )
+            }
+            AVAuthorizationStatusNotDetermined -> {
+                val granted = suspendCancellableCoroutine<Boolean> { cont ->
+                    AVCaptureDevice.requestAccessForMediaType(AVMediaTypeVideo) { isGranted ->
+                        cont.resume(isGranted)
+                    }
+                }
+                if (!granted) {
+                    return MediaPickerResult.Error(
+                        MediaPickerError.PermissionDenied("Camera permission was denied by the user.")
+                    )
+                }
+            }
+            else -> { /* Authorized, proceed */ }
+        }
+
+        return suspendCancellableCoroutine { continuation ->
+            val topViewController = presenter.getTopViewController()
+            if (topViewController == null) {
+                continuation.resume(
+                    MediaPickerResult.Error(
+                        MediaPickerError.OperationFailed(message = "No active UIViewController found to present Camera.")
+                    )
+                )
+                return@suspendCancellableCoroutine
+            }
+
+            val cameraController = UIImagePickerController().apply {
+                sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+            }
+
+            val delegate = IOSCameraCaptureDelegate(
+                continuation = continuation,
+                config = config,
+                onComplete = { activeCameraDelegate = null }
+            )
+            activeCameraDelegate = delegate
+            cameraController.delegate = delegate
+
+            continuation.invokeOnCancellation {
+                activeCameraDelegate = null
+                presenter.dismiss(cameraController)
+            }
+
+            presenter.present(
+                controller = cameraController,
+                onFailure = {
+                    activeCameraDelegate = null
+                    if (continuation.isActive) {
+                        continuation.resume(
+                            MediaPickerResult.Error(
+                                MediaPickerError.OperationFailed(message = "Failed to present Camera: top UIViewController unavailable on main thread.")
+                            )
+                        )
+                    }
+                }
+            )
+        }
     }
 
     override suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult {
-        return MediaPickerResult.Error(
-            MediaPickerError.OperationFailed(message = "iOS Audio Picker will be implemented in Phase 6.")
-        )
+        return launchDocumentPicker(config, allowMultiple = false, defaultMediaType = MediaType.AUDIO)
     }
 
     override suspend fun pickMultipleAudio(config: MediaPickerConfig): MediaPickerResult {
-        return MediaPickerResult.Error(
-            MediaPickerError.OperationFailed(message = "iOS Audio Picker will be implemented in Phase 6.")
-        )
+        return launchDocumentPicker(config, allowMultiple = true, defaultMediaType = MediaType.AUDIO)
     }
 
     private suspend fun launchPhotoPicker(
@@ -123,24 +200,44 @@ class IOSMediaPickerBridge(
         }
 
         val pickerConfig = PHPickerConfiguration().apply {
-            this.selectionLimit = selectionLimit.toLong()
+            this.selectionLimit = if (selectionLimit >= Int.MAX_VALUE) 0L else selectionLimit.toLong()
             this.filter = filter
         }
 
         val pickerController = PHPickerViewController(configuration = pickerConfig)
-        val delegate = IOSPhotoPickerDelegate(continuation, config, defaultMediaType)
+        val delegate = IOSPhotoPickerDelegate(
+            continuation = continuation,
+            config = config,
+            defaultMediaType = defaultMediaType,
+            onComplete = { activePhotoDelegate = null }
+        )
+        activePhotoDelegate = delegate
         pickerController.delegate = delegate
 
         continuation.invokeOnCancellation {
+            activePhotoDelegate = null
             presenter.dismiss(pickerController)
         }
 
-        presenter.present(pickerController)
+        presenter.present(
+            controller = pickerController,
+            onFailure = {
+                activePhotoDelegate = null
+                if (continuation.isActive) {
+                    continuation.resume(
+                        MediaPickerResult.Error(
+                            MediaPickerError.OperationFailed(message = "Failed to present PHPicker: top UIViewController unavailable on main thread.")
+                        )
+                    )
+                }
+            }
+        )
     }
 
     private suspend fun launchDocumentPicker(
         config: MediaPickerConfig,
-        allowMultiple: Boolean
+        allowMultiple: Boolean,
+        defaultMediaType: MediaType = MediaType.DOCUMENT
     ): MediaPickerResult = suspendCancellableCoroutine { continuation ->
         val topViewController = presenter.getTopViewController()
         if (topViewController == null) {
@@ -152,18 +249,40 @@ class IOSMediaPickerBridge(
             return@suspendCancellableCoroutine
         }
 
-        val contentTypes = IOSMetadataExtractor.mimeTypesToUTTypes(config.allowedMimeTypes)
+        val contentTypes = IOSMetadataExtractor.mimeTypesToUTTypes(
+            mimeTypes = config.allowedMimeTypes,
+            defaultMediaType = defaultMediaType
+        )
         val documentPicker = UIDocumentPickerViewController(forOpeningContentTypes = contentTypes).apply {
             allowsMultipleSelection = allowMultiple
         }
 
-        val delegate = IOSDocumentPickerDelegate(continuation, config)
+        val delegate = IOSDocumentPickerDelegate(
+            continuation = continuation,
+            config = config,
+            defaultMediaType = defaultMediaType,
+            onComplete = { activeDocumentDelegate = null }
+        )
+        activeDocumentDelegate = delegate
         documentPicker.delegate = delegate
 
         continuation.invokeOnCancellation {
+            activeDocumentDelegate = null
             presenter.dismiss(documentPicker)
         }
 
-        presenter.present(documentPicker)
+        presenter.present(
+            controller = documentPicker,
+            onFailure = {
+                activeDocumentDelegate = null
+                if (continuation.isActive) {
+                    continuation.resume(
+                        MediaPickerResult.Error(
+                            MediaPickerError.OperationFailed(message = "Failed to present DocumentPicker: top UIViewController unavailable on main thread.")
+                        )
+                    )
+                }
+            }
+        )
     }
 }

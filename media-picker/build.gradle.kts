@@ -51,3 +51,31 @@ kotlin {
         }
     }
 }
+
+publishing {
+    publications.withType<MavenPublication> {
+        pom {
+            name.set("MediaPickerKMP")
+            description.set("A Production-Ready Media Picker Library for Kotlin Multiplatform (Android & iOS).")
+            url.set("https://github.com/gargpadmakar/MediaPickerKMP")
+            licenses {
+                license {
+                    name.set("The Apache License, Version 2.0")
+                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
+                }
+            }
+            developers {
+                developer {
+                    id.set("gargpadmakar")
+                    name.set("Padmakar Garg")
+                    url.set("https://github.com/gargpadmakar")
+                }
+            }
+            scm {
+                connection.set("scm:git:git://github.com/gargpadmakar/MediaPickerKMP.git")
+                developerConnection.set("scm:git:ssh://github.com/gargpadmakar/MediaPickerKMP.git")
+                url.set("https://github.com/gargpadmakar/MediaPickerKMP")
+            }
+        }
+    }
+}

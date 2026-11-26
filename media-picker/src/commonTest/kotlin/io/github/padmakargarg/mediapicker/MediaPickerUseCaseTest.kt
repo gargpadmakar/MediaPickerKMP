@@ -3,6 +3,8 @@ package io.github.padmakargarg.mediapicker
 import io.github.padmakargarg.mediapicker.domain.model.*
 import io.github.padmakargarg.mediapicker.domain.repository.MediaPickerRepository
 import io.github.padmakargarg.mediapicker.domain.usecase.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -243,5 +245,98 @@ class MediaPickerUseCaseTest {
 
         val result = picker.pickImage()
         assertIs<MediaPickerResult.Cancelled>(result)
+    }
+
+    @Test
+    fun testDefaultMediaPicker_concurrentRequestsAreRejectedByMutex() = runTest {
+        val suspendGate = CompletableDeferred<Unit>()
+        val repo = object : MediaPickerRepository {
+            override suspend fun pickImage(config: MediaPickerConfig): MediaPickerResult {
+                suspendGate.await()
+                return MediaPickerResult.Cancelled
+            }
+            override suspend fun pickMultipleImages(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickVideo(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickMultipleVideos(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickMedia(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun pickMultipleAudio(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+        }
+        val picker = DefaultMediaPicker(repo)
+
+        val firstJob = launch { picker.pickImage() }
+        testScheduler.runCurrent()
+
+        val secondResult = picker.pickVideo()
+        assertIs<MediaPickerResult.Error>(secondResult)
+        assertIs<MediaPickerError.OperationFailed>(secondResult.error)
+        assertTrue(secondResult.error.message.contains("already in progress"))
+
+        suspendGate.complete(Unit)
+        firstJob.join()
+    }
+
+    @Test
+    fun testDefaultMediaPicker_consecutiveRequestsSucceedAfterCompletion() = runTest {
+        val repo = FakeMediaPickerRepository(
+            returnResult = MediaPickerResult.Success(
+                listOf(MediaPickerItem(id = "1", uri = "uri://1", mediaType = MediaType.IMAGE))
+            )
+        )
+        val picker = DefaultMediaPicker(repo)
+
+        val firstResult = picker.pickImage()
+        assertIs<MediaPickerResult.Success>(firstResult)
+
+        val secondResult = picker.pickVideo()
+        assertIs<MediaPickerResult.Success>(secondResult)
+    }
+
+    @Test
+    fun testValidator_exactMaxFileSizeBytesAllowed() {
+        val exactSizeItem = MediaPickerItem(
+            id = "1",
+            uri = "uri://1",
+            sizeInBytes = 2048L
+        )
+        val result = MediaPickerResult.Success(listOf(exactSizeItem))
+        val config = MediaPickerConfig(maxFileSizeBytes = 2048L)
+
+        val validated = MediaPickerValidator.validateResult(result, config)
+        assertIs<MediaPickerResult.Success>(validated)
+    }
+
+    @Test
+    fun testValidator_exceededMaxFileSizeBytesRejected() {
+        val exceededItem = MediaPickerItem(
+            id = "1",
+            uri = "uri://1",
+            sizeInBytes = 2049L
+        )
+        val result = MediaPickerResult.Success(listOf(exceededItem))
+        val config = MediaPickerConfig(maxFileSizeBytes = 2048L)
+
+        val validated = MediaPickerValidator.validateResult(result, config)
+        assertIs<MediaPickerResult.Error>(validated)
+        assertIs<MediaPickerError.FileTooLarge>(validated.error)
+        assertEquals(2049L, validated.error.sizeInBytes)
+        assertEquals(2048L, validated.error.maxSizeBytes)
+    }
+
+    @Test
+    fun testValidator_enforcesMimeParametersNormalization() {
+        val itemWithParam = MediaPickerItem(
+            id = "1",
+            uri = "uri://1",
+            mimeType = "application/pdf; charset=utf-8"
+        )
+        val result = MediaPickerResult.Success(listOf(itemWithParam))
+        val config = MediaPickerConfig(allowedMimeTypes = listOf("application/pdf"))
+
+        val validated = MediaPickerValidator.validateResult(result, config)
+        assertIs<MediaPickerResult.Success>(validated)
     }
 }

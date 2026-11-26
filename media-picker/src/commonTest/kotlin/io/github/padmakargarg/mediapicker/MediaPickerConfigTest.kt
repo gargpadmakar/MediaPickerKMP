@@ -83,4 +83,34 @@ class MediaPickerConfigTest {
         assertTrue(universalWildcard.isMimeTypeAllowed("image/jpeg"))
         assertTrue(universalWildcard.isMimeTypeAllowed("video/mp4"))
     }
+
+    @Test
+    fun testIsMimeTypeAllowed_parametersAndWhitespaceNormalization() {
+        val config = MediaPickerConfig(
+            allowedMimeTypes = listOf("application/pdf", "image/png", "text/plain")
+        )
+
+        // Stripping parameters
+        assertTrue(config.isMimeTypeAllowed("application/pdf; charset=utf-8"))
+        assertTrue(config.isMimeTypeAllowed("text/plain; format=flowed; charset=us-ascii"))
+
+        // Whitespace and case-insensitivity
+        assertTrue(config.isMimeTypeAllowed("  image/png  "))
+        assertTrue(config.isMimeTypeAllowed("APPLICATION/PDF"))
+        assertTrue(config.isMimeTypeAllowed("Image/PNG; size=original"))
+
+        // Null and blank values
+        assertFalse(config.isMimeTypeAllowed(""))
+        assertFalse(config.isMimeTypeAllowed("   "))
+        assertFalse(config.isMimeTypeAllowed(";charset=utf-8"))
+        assertFalse(config.isMimeTypeAllowed(null))
+    }
+
+    @Test
+    fun testIsMimeTypeAllowed_wildcardWithParameters() {
+        val imageConfig = MediaPickerConfig(allowedMimeTypes = listOf("image/*"))
+        assertTrue(imageConfig.isMimeTypeAllowed("image/jpeg; q=0.8"))
+        assertTrue(imageConfig.isMimeTypeAllowed("IMAGE/WEBP; param=test"))
+        assertFalse(imageConfig.isMimeTypeAllowed("video/mp4; codecs=avc1"))
+    }
 }

@@ -27,14 +27,21 @@ data class MediaPickerConfig(
 
     /**
      * Validates whether a given MIME type is acceptable based on allowed MIME types.
+     *
+     * Performs robust normalization:
+     * - Strips MIME parameters (e.g. "application/pdf; charset=utf-8" -> "application/pdf")
+     * - Trims leading and trailing whitespace
+     * - Normalizes case to lowercase
+     * - Supports wildcards such as wildcard asterisk, asterisk slash asterisk, and prefix wildcards such as image wildcard
      */
     fun isMimeTypeAllowed(mimeType: String?): Boolean {
         if (allowedMimeTypes.isEmpty()) return true
         if (mimeType.isNullOrBlank()) return false
-        val normalized = mimeType.trim().lowercase()
+        val normalized = mimeType.substringBefore(';').trim().lowercase()
+        if (normalized.isBlank()) return false
 
         return allowedMimeTypes.any { pattern ->
-            val p = pattern.trim().lowercase()
+            val p = pattern.substringBefore(';').trim().lowercase()
             when {
                 p == "*" || p == "*/*" -> true
                 p.endsWith("/*") -> {

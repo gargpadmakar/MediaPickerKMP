@@ -137,12 +137,42 @@ object AndroidMetadataExtractor {
         )
     }
 
-    private fun copyUriToCache(context: Context, uri: Uri, targetFileName: String): String? {
+    internal fun sanitizeFileName(rawName: String?, fallbackExtension: String? = null): String {
+        if (rawName.isNullOrBlank()) {
+            val ext = fallbackExtension?.takeIf { it.isNotBlank() }?.let { ".$it" } ?: ".bin"
+            return "media_${UUID.randomUUID().toString().take(8)}$ext"
+        }
+
+        // Strip path traversal and path separators (/ and \)
+        var clean = rawName.substringAfterLast('/').substringAfterLast('\\').trim()
+
+        // Replace invalid or dangerous filesystem characters with underscore
+        clean = clean.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+
+        // Prevent leading dots (hidden files / relative navigation)
+        clean = clean.trimStart('.')
+
+        if (clean.isBlank()) {
+            val ext = fallbackExtension?.takeIf { it.isNotBlank() }?.let { ".$it" } ?: ".bin"
+            clean = "media_${UUID.randomUUID().toString().take(8)}$ext"
+        }
+
+        return clean
+    }
+
+    internal fun copyUriToCache(context: Context, uri: Uri, targetFileName: String): String? {
         return try {
             val cacheFolder = File(context.cacheDir, "mediapicker_cache").apply {
                 if (!exists()) mkdirs()
             }
-            val targetFile = File(cacheFolder, "${System.currentTimeMillis()}_$targetFileName")
+            val safeFileName = sanitizeFileName(targetFileName)
+            val targetFile = File(cacheFolder, "${System.currentTimeMillis()}_$safeFileName")
+
+            // Strict canonical path traversal guard
+            if (!targetFile.canonicalPath.startsWith(cacheFolder.canonicalPath)) {
+                return null
+            }
+
             context.contentResolver.openInputStream(uri)?.use { input ->
                 FileOutputStream(targetFile).use { output ->
                     val buffer = ByteArray(BUFFER_SIZE)

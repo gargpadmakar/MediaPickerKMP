@@ -44,26 +44,48 @@ class IOSMediaPickerTest {
 
         val pdfTypes = IOSMetadataExtractor.mimeTypesToUTTypes(listOf("application/pdf"))
         assertEquals(listOf(UTTypePDF), pdfTypes)
+
+        val parameterTypes = IOSMetadataExtractor.mimeTypesToUTTypes(listOf("application/pdf; charset=utf-8", " IMAGE/* "))
+        assertEquals(listOf(UTTypePDF, UTTypeImage), parameterTypes)
     }
 
     @Test
-    fun testPhase6StubsReturnError() = runTest {
+    fun testAudioMimeTypesToUTTypes() {
+        val audioWildcard = IOSMetadataExtractor.mimeTypesToUTTypes(listOf("audio/*"))
+        assertEquals(listOf(UTTypeAudio), audioWildcard)
+
+        val defaultAudio = IOSMetadataExtractor.mimeTypesToUTTypes(emptyList(), defaultMediaType = io.github.padmakargarg.mediapicker.domain.model.MediaType.AUDIO)
+        assertEquals(listOf(UTTypeAudio), defaultAudio)
+
+        val mp3Types = IOSMetadataExtractor.mimeTypesToUTTypes(listOf("audio/mpeg", "audio/mp3"))
+        assertEquals(listOf(UTTypeMP3), mp3Types)
+
+        val wavTypes = IOSMetadataExtractor.mimeTypesToUTTypes(listOf("audio/wav", "audio/x-wav"))
+        assertEquals(listOf(UTTypeWAV), wavTypes)
+
+        val multiAudio = IOSMetadataExtractor.mimeTypesToUTTypes(
+            listOf("audio/mpeg", "audio/wav", "audio/flac", "audio/m4a", "audio/ogg", "audio/opus")
+        )
+        assertTrue(multiAudio.contains(UTTypeMP3))
+        assertTrue(multiAudio.contains(UTTypeWAV))
+        assertTrue(multiAudio.isNotEmpty())
+    }
+
+    @Test
+    fun testCameraAvailabilityHandling() = runTest {
         val picker = IOSMediaPicker()
         val config = MediaPickerConfig.DEFAULT
 
+        val isCameraHardwareAvailable = platform.UIKit.UIImagePickerController.isSourceTypeAvailable(
+            platform.UIKit.UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+        )
+
         val captureResult = picker.capturePhoto(config)
-        assertIs<MediaPickerResult.Error>(captureResult)
-        assertIs<MediaPickerError.OperationFailed>(captureResult.error)
-        assertTrue(captureResult.error.message.contains("Phase 6"))
 
-        val audioResult = picker.pickAudio(config)
-        assertIs<MediaPickerResult.Error>(audioResult)
-        assertIs<MediaPickerError.OperationFailed>(audioResult.error)
-        assertTrue(audioResult.error.message.contains("Phase 6"))
-
-        val multiAudioResult = picker.pickMultipleAudio(config)
-        assertIs<MediaPickerResult.Error>(multiAudioResult)
-        assertIs<MediaPickerError.OperationFailed>(multiAudioResult.error)
-        assertTrue(multiAudioResult.error.message.contains("Phase 6"))
+        if (!isCameraHardwareAvailable) {
+            assertIs<MediaPickerResult.Error>(captureResult)
+            assertIs<MediaPickerError.CameraUnavailable>(captureResult.error)
+            assertTrue(captureResult.error.message.contains("Camera hardware is not available"))
+        }
     }
 }

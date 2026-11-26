@@ -23,11 +23,20 @@ object IOSMetadataExtractor {
     /**
      * Maps a list of MIME types to matching iOS [UTType] objects for picker filtering.
      */
-    fun mimeTypesToUTTypes(mimeTypes: List<String>): List<UTType> {
-        if (mimeTypes.isEmpty() || mimeTypes.contains("*/*")) {
-            return listOf(UTTypeItem)
+    fun mimeTypesToUTTypes(
+        mimeTypes: List<String>,
+        defaultMediaType: MediaType = MediaType.UNKNOWN
+    ): List<UTType> {
+        if (mimeTypes.isEmpty() || mimeTypes.any { it.trim() == "*/*" }) {
+            return when (defaultMediaType) {
+                MediaType.AUDIO -> listOf(UTTypeAudio)
+                MediaType.IMAGE -> listOf(UTTypeImage)
+                MediaType.VIDEO -> listOf(UTTypeMovie)
+                else -> listOf(UTTypeItem)
+            }
         }
-        val types = mimeTypes.mapNotNull { mime ->
+        val types = mimeTypes.mapNotNull { rawMime ->
+            val mime = rawMime.substringBefore(';').trim().lowercase()
             when (mime) {
                 "image/*" -> UTTypeImage
                 "video/*" -> UTTypeMovie
@@ -38,10 +47,19 @@ object IOSMetadataExtractor {
                 "text/html" -> UTTypeHTML
                 "application/json" -> UTTypeJSON
                 "application/zip" -> UTTypeZIP
-                else -> UTType.typeWithMIMEType(mime) ?: UTTypeItem
+                "audio/mpeg", "audio/mp3" -> UTTypeMP3
+                "audio/wav", "audio/x-wav" -> UTTypeWAV
+                "audio/aac" -> UTType.typeWithMIMEType("audio/aac") ?: UTTypeAudio
+                "audio/m4a", "audio/x-m4a" -> UTType.typeWithFilenameExtension("m4a") ?: UTTypeAudio
+                "audio/flac" -> UTType.typeWithFilenameExtension("flac") ?: UTTypeAudio
+                "audio/ogg" -> UTType.typeWithFilenameExtension("ogg") ?: UTTypeAudio
+                "audio/opus" -> UTType.typeWithFilenameExtension("opus") ?: UTTypeAudio
+                else -> UTType.typeWithMIMEType(mime) ?: if (defaultMediaType == MediaType.AUDIO) UTTypeAudio else UTTypeItem
             }
         }.distinct()
-        return types.ifEmpty { listOf(UTTypeItem) }
+        return types.ifEmpty {
+            if (defaultMediaType == MediaType.AUDIO) listOf(UTTypeAudio) else listOf(UTTypeItem)
+        }
     }
 
     /**
@@ -66,6 +84,14 @@ object IOSMetadataExtractor {
             val fileSizeNumber = attributes?.get(NSFileSize) as? NSNumber
             sizeInBytes = fileSizeNumber?.longLongValue
         } catch (_: Exception) {}
+
+        if (sizeInBytes == null || sizeInBytes == 0L) {
+            try {
+                val resourceValues = url.resourceValuesForKeys(listOf(NSURLFileSizeKey), error = null)
+                val fileSizeNumber = resourceValues?.get(NSURLFileSizeKey) as? NSNumber
+                sizeInBytes = fileSizeNumber?.longLongValue
+            } catch (_: Exception) {}
+        }
 
         // 2. MIME Type & UTType
         var mimeType: String? = null
@@ -124,10 +150,12 @@ object IOSMetadataExtractor {
 
         // 5. Cache copy if requested
         var localPath: String? = if (path.isNotBlank()) path else null
+        var resolvedUri: String = url.absoluteString ?: ("file://" + path)
         if (config.copyToCache || forceCacheCopy) {
             val copiedPath = copyUrlToCache(url, fileName)
             if (copiedPath != null) {
                 localPath = copiedPath
+                resolvedUri = NSURL.fileURLWithPath(copiedPath).absoluteString ?: ("file://" + copiedPath)
             }
         }
 
@@ -138,7 +166,7 @@ object IOSMetadataExtractor {
             extension = extension,
             sizeInBytes = sizeInBytes,
             mediaType = mediaType,
-            uri = url.absoluteString ?: ("file://" + path),
+            uri = resolvedUri,
             localPath = localPath,
             width = width,
             height = height,

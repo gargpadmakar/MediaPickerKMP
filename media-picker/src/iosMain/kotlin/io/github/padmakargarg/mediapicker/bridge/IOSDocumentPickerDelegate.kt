@@ -17,10 +17,15 @@ import kotlin.coroutines.resume
  */
 class IOSDocumentPickerDelegate(
     private val continuation: CancellableContinuation<MediaPickerResult>,
-    private val config: MediaPickerConfig
+    private val config: MediaPickerConfig,
+    private val defaultMediaType: MediaType = MediaType.DOCUMENT,
+    private val onComplete: () -> Unit = {}
 ) : NSObject(), UIDocumentPickerDelegateProtocol {
 
     override fun documentPicker(controller: UIDocumentPickerViewController, didPickDocumentsAtURLs: List<*>) {
+        controller.dismissViewControllerAnimated(flag = true, completion = null)
+        onComplete()
+
         val urls = didPickDocumentsAtURLs.filterIsInstance<NSURL>()
         if (urls.isEmpty()) {
             if (continuation.isActive) {
@@ -36,7 +41,7 @@ class IOSDocumentPickerDelegate(
                 val item = IOSMetadataExtractor.extractItem(
                     url = url,
                     config = config,
-                    defaultMediaType = MediaType.DOCUMENT,
+                    defaultMediaType = defaultMediaType,
                     forceCacheCopy = config.copyToCache
                 )
                 items.add(item)
@@ -58,6 +63,8 @@ class IOSDocumentPickerDelegate(
     }
 
     override fun documentPickerWasCancelled(controller: UIDocumentPickerViewController) {
+        controller.dismissViewControllerAnimated(flag = true, completion = null)
+        onComplete()
         if (continuation.isActive) {
             continuation.resume(MediaPickerResult.Cancelled)
         }

@@ -3,10 +3,13 @@ package io.github.padmakargarg.mediapicker
 import io.github.padmakargarg.mediapicker.domain.model.MediaPickerConfig
 import io.github.padmakargarg.mediapicker.domain.model.MediaPickerError
 import io.github.padmakargarg.mediapicker.domain.model.MediaPickerResult
+import io.github.padmakargarg.mediapicker.util.AndroidMetadataExtractor
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class AndroidMediaPickerTest {
 
@@ -42,5 +45,44 @@ class AndroidMediaPickerTest {
         val result = picker.capturePhoto(MediaPickerConfig.DEFAULT)
         assertIs<MediaPickerResult.Error>(result)
         assertIs<MediaPickerError.OperationFailed>(result.error)
+    }
+
+    @Test
+    fun testAndroidMetadataExtractor_sanitizeFileName_pathTraversalStripped() {
+        val unixTraversal = AndroidMetadataExtractor.sanitizeFileName("../../../evil.pdf")
+        assertEquals("evil.pdf", unixTraversal)
+
+        val windowsTraversal = AndroidMetadataExtractor.sanitizeFileName("..\\..\\..\\malicious.exe")
+        assertEquals("malicious.exe", windowsTraversal)
+
+        val mixedTraversal = AndroidMetadataExtractor.sanitizeFileName("foo/bar\\../../hack.txt")
+        assertEquals("hack.txt", mixedTraversal)
+    }
+
+    @Test
+    fun testAndroidMetadataExtractor_sanitizeFileName_invalidCharactersReplaced() {
+        val badChars = AndroidMetadataExtractor.sanitizeFileName("report : * ? < > | # \$.pdf")
+        assertFalse(badChars.contains(":"))
+        assertFalse(badChars.contains("*"))
+        assertFalse(badChars.contains("?"))
+        assertFalse(badChars.contains("<"))
+        assertFalse(badChars.contains(">"))
+        assertFalse(badChars.contains("|"))
+        assertTrue(badChars.endsWith(".pdf"))
+    }
+
+    @Test
+    fun testAndroidMetadataExtractor_sanitizeFileName_blankOrNullFallback() {
+        val nullName = AndroidMetadataExtractor.sanitizeFileName(null, "jpg")
+        assertTrue(nullName.startsWith("media_"))
+        assertTrue(nullName.endsWith(".jpg"))
+
+        val blankName = AndroidMetadataExtractor.sanitizeFileName("   ", "png")
+        assertTrue(blankName.startsWith("media_"))
+        assertTrue(blankName.endsWith(".png"))
+
+        val dotDots = AndroidMetadataExtractor.sanitizeFileName("...", "bin")
+        assertTrue(dotDots.startsWith("media_"))
+        assertTrue(dotDots.endsWith(".bin"))
     }
 }
