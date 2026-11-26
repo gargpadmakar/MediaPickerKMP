@@ -109,44 +109,31 @@ MediaPickerKMP adheres to Clean Architecture and MVVM principles across Kotlin M
 ```mermaid
 flowchart TD
     subgraph UI["Presentation Layer (:media-picker-compose)"]
-        A["App Screen / Composable"] --> B["rememberMediaPickerState() / rememberMediaPicker()"]
-        B --> C["MediaPickerState (Reactive StateFlow)"]
-        B --> D["Prebuilt UI: BottomSheet & Dialog"]
+        A["App Screen<br/>Composable UI"] --> B["rememberMediaPickerState()<br/>rememberMediaPicker()"]
+        B --> C["MediaPickerState<br/>(StateFlow)"]
+        B --> D["BottomSheet<br/>& Dialog"]
     end
 
     subgraph Domain["Core Domain Layer (commonMain)"]
-        E["MediaPicker (Public API Interface)"]
-        F["DefaultMediaPicker (Mutex Protection)"]
-        G["MediaPickerConfig & MediaPickerResult"]
-        E --> F
+        E["MediaPicker<br/>Interface"] --> F["DefaultMediaPicker<br/>(Mutex Guard)"]
+        G["MediaPickerConfig<br/>& Result Models"]
     end
 
     subgraph Data["Data Layer (commonMain)"]
-        H["MediaPickerRepository"]
-        I["MediaPickerRepositoryImpl"]
-        J["PlatformMediaPickerBridge (expect / actual)"]
-        H --> I
-        I --> J
+        H["MediaPicker<br/>Repository"] --> I["Repository Impl<br/>(Validation)"]
+        I --> J["Platform Bridge<br/>(expect / actual)"]
     end
 
     subgraph AndroidPlatform["Android Platform (androidMain)"]
-        K["AndroidMediaPickerBridge"]
-        L["ActivityResultLauncher (Lifecycle Safe)"]
-        M["AndroidMetadataExtractor"]
-        N["PhotoPicker / SAF / FileProvider"]
-        K --> L
-        L --> N
-        N --> M
+        K["Android Bridge"] --> L["Activity Result<br/>Launcher"]
+        L --> N["PhotoPicker / SAF<br/>FileProvider"]
+        N --> M["Android Metadata<br/>& Stream Cacher"]
     end
 
     subgraph IOSPlatform["iOS Platform (iosMain)"]
-        O["IOSMediaPickerBridge"]
-        P["IOSViewControllerPresenter (Main Thread)"]
-        Q["IOSMetadataExtractor"]
-        R["PHPicker / UIDocumentPicker / UIImagePicker"]
-        O --> P
-        P --> R
-        R --> Q
+        O["iOS Bridge"] --> P["ViewController<br/>Presenter"]
+        P --> R["PHPicker / Document<br/>Camera Picker"]
+        R --> Q["iOS Metadata<br/>& Scoped URL"]
     end
 
     UI --> Domain

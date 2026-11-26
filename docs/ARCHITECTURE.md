@@ -7,38 +7,38 @@ MediaPickerKMP adheres to Clean Architecture and MVVM principles across Kotlin M
 ```mermaid
 flowchart TD
     subgraph Presentation["Presentation Layer (:media-picker-compose)"]
-        UI["Compose Screens & Components"]
-        State["MediaPickerState & MediaPickerUiState"]
+        UI["Compose Screens<br/>& Components"]
+        State["MediaPickerState<br/>(Reactive StateFlow)"]
         UI --> State
     end
 
     subgraph Domain["Domain Layer (:media-picker commonMain)"]
-        Interface["MediaPicker Interface"]
-        Default["DefaultMediaPicker (Mutex Guards)"]
-        Config["MediaPickerConfig & MediaPickerResult"]
+        Interface["MediaPicker<br/>Interface"]
+        Default["DefaultMediaPicker<br/>(Mutex Guard)"]
+        Config["MediaPickerConfig<br/>& Result Models"]
         Interface --> Default
     end
 
     subgraph Data["Data Layer (:media-picker commonMain)"]
-        Repo["MediaPickerRepository"]
-        RepoImpl["MediaPickerRepositoryImpl"]
-        Bridge["PlatformMediaPickerBridge (expect / actual)"]
+        Repo["MediaPicker<br/>Repository"]
+        RepoImpl["Repository Impl<br/>(Validation)"]
+        Bridge["Platform Bridge<br/>(expect / actual)"]
         Repo --> RepoImpl
         RepoImpl --> Bridge
     end
 
     subgraph Android["Android Platform (androidMain)"]
-        ABridge["AndroidMediaPickerBridge"]
-        ALauncher["ActivityResultLauncher (Lifecycle Safe)"]
-        AExtractor["AndroidMetadataExtractor & Cache Streamer"]
+        ABridge["Android Bridge"]
+        ALauncher["Activity Result<br/>Launcher"]
+        AExtractor["Metadata Extractor<br/>& Stream Cacher"]
         ABridge --> ALauncher
         ALauncher --> AExtractor
     end
 
     subgraph IOS["iOS Platform (iosMain)"]
-        IBridge["IOSMediaPickerBridge"]
-        IPresenter["IOSViewControllerPresenter (Main Queue)"]
-        IExtractor["IOSMetadataExtractor & Security Scoped Handling"]
+        IBridge["iOS Bridge"]
+        IPresenter["ViewController<br/>Presenter"]
+        IExtractor["iOS Metadata<br/>& Scoped URL"]
         IBridge --> IPresenter
         IPresenter --> IExtractor
     end
