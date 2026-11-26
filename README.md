@@ -106,36 +106,88 @@ Below is the complete execution pipeline showing how MediaPickerKMP processes an
 
 MediaPickerKMP adheres to Clean Architecture and MVVM principles across Kotlin Multiplatform targets:
 
+```mermaid
+flowchart TD
+    subgraph UI["Presentation Layer (:media-picker-compose)"]
+        A["App Screen / Composable"] --> B["rememberMediaPickerState() / rememberMediaPicker()"]
+        B --> C["MediaPickerState (Reactive StateFlow)"]
+        B --> D["Prebuilt UI: BottomSheet & Dialog"]
+    end
+
+    subgraph Domain["Core Domain Layer (commonMain)"]
+        E["MediaPicker (Public API Interface)"]
+        F["DefaultMediaPicker (Mutex Protection)"]
+        G["MediaPickerConfig & MediaPickerResult"]
+        E --> F
+    end
+
+    subgraph Data["Data Layer (commonMain)"]
+        H["MediaPickerRepository"]
+        I["MediaPickerRepositoryImpl"]
+        J["PlatformMediaPickerBridge (expect / actual)"]
+        H --> I
+        I --> J
+    end
+
+    subgraph AndroidPlatform["Android Platform (androidMain)"]
+        K["AndroidMediaPickerBridge"]
+        L["ActivityResultLauncher (Lifecycle Safe)"]
+        M["AndroidMetadataExtractor"]
+        N["PhotoPicker / SAF / FileProvider"]
+        K --> L
+        L --> N
+        N --> M
+    end
+
+    subgraph IOSPlatform["iOS Platform (iosMain)"]
+        O["IOSMediaPickerBridge"]
+        P["IOSViewControllerPresenter (Main Thread)"]
+        Q["IOSMetadataExtractor"]
+        R["PHPicker / UIDocumentPicker / UIImagePicker"]
+        O --> P
+        P --> R
+        R --> Q
+    end
+
+    UI --> Domain
+    Domain --> Data
+    J --> AndroidPlatform
+    J --> IOSPlatform
+    M --> J
+    Q --> J
 ```
-+----------------------------------------------------------------+
-|                   Presentation Layer                           |
-|  - :media-picker-compose (Composable functions, BottomSheets)  |
-|  - MediaPickerState / MediaPickerUiState                       |
-+----------------------------------------------------------------+
-                               │
-                               ▼
-+----------------------------------------------------------------+
-|                     Domain Layer (Core)                        |
-|  - MediaPicker (Interface)                                     |
-|  - MediaPickerConfig & MediaPickerResult & MediaPickerItem     |
-|  - DefaultMediaPicker (Single-Flight Mutex Protection)         |
-+----------------------------------------------------------------+
-                               │
-                               ▼
-+----------------------------------------------------------------+
-|                      Data Layer                                |
-|  - MediaPickerRepository & MediaPickerRepositoryImpl           |
-|  - PlatformMediaPickerBridge (expect/actual)                   |
-+----------------------------------------------------------------+
-             │                                    │
-             ▼                                    ▼
-+─────────────────────────────+     +─────────────────────────────+
-|    Android Platform Main    |     |      iOS Platform Main      |
-| - AndroidMediaPickerBridge  |     | - IOSMediaPickerBridge      |
-| - ActivityResultLauncher    |     | - IOSViewControllerPresenter|
-| - AndroidMetadataExtractor  |     | - PHPickerViewController    |
-| - FileProvider / SAF        |     | - UIDocumentPicker / UIImage|
-+─────────────────────────────+     +─────────────────────────────+
+
+### End-to-End Sequence & Execution Flow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer / UI
+    participant MP as MediaPicker
+    participant Mutex as Single-Flight Mutex
+    participant Repo as MediaPickerRepository
+    participant Bridge as PlatformBridge
+    participant OS as Native OS (Android / iOS)
+    participant Cache as Metadata & Cache Pipeline
+
+    Dev->>MP: pickImage(config) / capturePhoto()
+    MP->>Mutex: Check lock availability
+    alt Operation already in progress
+        Mutex-->>Dev: Return MediaPickerResult.Error(OperationFailed)
+    else Mutex acquired
+        MP->>Repo: requestMedia(config)
+        Repo->>Bridge: launchPlatformPicker(config)
+        Bridge->>OS: Launch Activity / Present ViewController
+        Note over OS: User selects media or captures photo
+        OS-->>Bridge: Native Uri / NSURL
+        Bridge->>Cache: Sanitize filename & stream to cache (8 KB buffer)
+        Cache-->>Bridge: Validated MediaPickerItem
+        Bridge-->>Repo: Return PlatformResult
+        Repo->>Repo: Enforce maxFileSizeBytes & MIME checks
+        Repo-->>MP: MediaPickerResult.Success
+        MP->>Mutex: Release lock
+        MP-->>Dev: Return Success to Composable
+    end
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for architectural details.

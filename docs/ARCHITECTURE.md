@@ -4,36 +4,49 @@ MediaPickerKMP adheres to Clean Architecture and MVVM principles across Kotlin M
 
 ## Layer Structure
 
-```
-+----------------------------------------------------------------+
-|                   Presentation Layer                           |
-|  - :media-picker-compose (Composable functions, BottomSheets)  |
-|  - MediaPickerState / MediaPickerUiState                       |
-+----------------------------------------------------------------+
-                               |
-                               v
-+----------------------------------------------------------------+
-|                     Domain Layer (Core)                        |
-|  - MediaPicker (Interface)                                     |
-|  - MediaPickerConfig & MediaPickerResult & MediaPickerItem     |
-|  - Use Cases / DefaultMediaPicker (Single-Flight Mutex)        |
-+----------------------------------------------------------------+
-                               |
-                               v
-+----------------------------------------------------------------+
-|                      Data Layer                                |
-|  - MediaPickerRepository & MediaPickerRepositoryImpl           |
-|  - PlatformMediaPickerBridge (expect/actual)                   |
-+----------------------------------------------------------------+
-             |                                    |
-             v                                    v
-+-----------------------------+     +-----------------------------+
-|    Android Platform Main    |     |      iOS Platform Main      |
-| - AndroidMediaPickerBridge  |     | - IOSMediaPickerBridge      |
-| - ActivityResultLauncher    |     | - IOSViewControllerPresenter|
-| - AndroidMetadataExtractor  |     | - PHPickerViewController    |
-| - FileProvider / SAF        |     | - UIDocumentPicker / UIImage|
-+-----------------------------+     +-----------------------------+
+```mermaid
+flowchart TD
+    subgraph Presentation["Presentation Layer (:media-picker-compose)"]
+        UI["Compose Screens & Components"]
+        State["MediaPickerState & MediaPickerUiState"]
+        UI --> State
+    end
+
+    subgraph Domain["Domain Layer (:media-picker commonMain)"]
+        Interface["MediaPicker Interface"]
+        Default["DefaultMediaPicker (Mutex Guards)"]
+        Config["MediaPickerConfig & MediaPickerResult"]
+        Interface --> Default
+    end
+
+    subgraph Data["Data Layer (:media-picker commonMain)"]
+        Repo["MediaPickerRepository"]
+        RepoImpl["MediaPickerRepositoryImpl"]
+        Bridge["PlatformMediaPickerBridge (expect / actual)"]
+        Repo --> RepoImpl
+        RepoImpl --> Bridge
+    end
+
+    subgraph Android["Android Platform (androidMain)"]
+        ABridge["AndroidMediaPickerBridge"]
+        ALauncher["ActivityResultLauncher (Lifecycle Safe)"]
+        AExtractor["AndroidMetadataExtractor & Cache Streamer"]
+        ABridge --> ALauncher
+        ALauncher --> AExtractor
+    end
+
+    subgraph IOS["iOS Platform (iosMain)"]
+        IBridge["IOSMediaPickerBridge"]
+        IPresenter["IOSViewControllerPresenter (Main Queue)"]
+        IExtractor["IOSMetadataExtractor & Security Scoped Handling"]
+        IBridge --> IPresenter
+        IPresenter --> IExtractor
+    end
+
+    Presentation --> Domain
+    Domain --> Data
+    Bridge --> Android
+    Bridge --> IOS
 ```
 
 ## Core Design Principles
