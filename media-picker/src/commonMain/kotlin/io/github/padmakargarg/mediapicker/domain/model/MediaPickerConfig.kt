@@ -16,12 +16,24 @@ data class MediaPickerConfig(
     val allowedMimeTypes: List<String> = emptyList(),
     val maxFileSizeBytes: Long? = null,
     val copyToCache: Boolean = false,
-    val extractMetadata: Boolean = true
+    val extractMetadata: Boolean = true,
+    val compressionQuality: Int? = null,
+    val maxImageWidth: Int? = null,
+    val maxImageHeight: Int? = null
 ) {
     init {
         require(maxSelection >= 1) { "maxSelection must be at least 1, but was $maxSelection" }
         maxFileSizeBytes?.let {
             require(it > 0) { "maxFileSizeBytes must be greater than 0, but was $it" }
+        }
+        compressionQuality?.let {
+            require(it in 1..100) { "compressionQuality must be between 1 and 100, but was $it" }
+        }
+        maxImageWidth?.let {
+            require(it > 0) { "maxImageWidth must be greater than 0, but was $it" }
+        }
+        maxImageHeight?.let {
+            require(it > 0) { "maxImageHeight must be greater than 0, but was $it" }
         }
     }
 
@@ -60,14 +72,20 @@ data class MediaPickerConfig(
             allowedMimeTypes: List<String> = emptyList(),
             maxFileSizeBytes: Long? = null,
             copyToCache: Boolean = false,
-            extractMetadata: Boolean = true
+            extractMetadata: Boolean = true,
+            compressionQuality: Int? = null,
+            maxImageWidth: Int? = null,
+            maxImageHeight: Int? = null
         ) = MediaPickerConfig(
             allowMultiple = false,
             maxSelection = 1,
             allowedMimeTypes = allowedMimeTypes,
             maxFileSizeBytes = maxFileSizeBytes,
             copyToCache = copyToCache,
-            extractMetadata = extractMetadata
+            extractMetadata = extractMetadata,
+            compressionQuality = compressionQuality,
+            maxImageWidth = maxImageWidth,
+            maxImageHeight = maxImageHeight
         )
 
         fun multiple(
@@ -75,14 +93,20 @@ data class MediaPickerConfig(
             allowedMimeTypes: List<String> = emptyList(),
             maxFileSizeBytes: Long? = null,
             copyToCache: Boolean = false,
-            extractMetadata: Boolean = true
+            extractMetadata: Boolean = true,
+            compressionQuality: Int? = null,
+            maxImageWidth: Int? = null,
+            maxImageHeight: Int? = null
         ) = MediaPickerConfig(
             allowMultiple = true,
             maxSelection = maxSelection,
             allowedMimeTypes = allowedMimeTypes,
             maxFileSizeBytes = maxFileSizeBytes,
             copyToCache = copyToCache,
-            extractMetadata = extractMetadata
+            extractMetadata = extractMetadata,
+            compressionQuality = compressionQuality,
+            maxImageWidth = maxImageWidth,
+            maxImageHeight = maxImageHeight
         )
     }
 }

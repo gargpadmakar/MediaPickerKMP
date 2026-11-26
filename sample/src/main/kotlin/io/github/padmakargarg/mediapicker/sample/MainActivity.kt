@@ -51,6 +51,20 @@ class MainActivity : ComponentActivity() {
                             subtitle = "Take a high-res photo using camera"
                         ) { state.capturePhoto(MediaPickerConfig.single()) },
                         MediaPickerActionItem(
+                            id = "compressed_image",
+                            title = "Compressed Image (70%)",
+                            subtitle = "Compresses to 70% quality, max 1080px"
+                        ) {
+                            state.pickImage(
+                                MediaPickerConfig.single(
+                                    copyToCache = true,
+                                    compressionQuality = 70,
+                                    maxImageWidth = 1080,
+                                    maxImageHeight = 1080
+                                )
+                            )
+                        },
+                        MediaPickerActionItem(
                             id = "single_image",
                             title = "Pick Single Image",
                             subtitle = "Select 1 image from gallery"
@@ -208,6 +222,44 @@ class MainActivity : ComponentActivity() {
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+
+                        // Compression row
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                FilledTonalButton(
+                                    onClick = {
+                                        state.capturePhoto(
+                                            MediaPickerConfig.single(
+                                                compressionQuality = 70,
+                                                maxImageWidth = 1280
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Camera (Comp 70%)", maxLines = 1)
+                                }
+                                FilledTonalButton(
+                                    onClick = {
+                                        state.pickImage(
+                                            MediaPickerConfig.single(
+                                                copyToCache = true,
+                                                compressionQuality = 70,
+                                                maxImageWidth = 1080
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Image (Comp 70%)", maxLines = 1)
+                                }
+                            }
                         }
 
                         item {

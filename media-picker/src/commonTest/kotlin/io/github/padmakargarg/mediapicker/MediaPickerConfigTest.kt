@@ -63,6 +63,38 @@ class MediaPickerConfigTest {
     }
 
     @Test
+    fun testConfigValidation_rejectsInvalidCompressionQuality() {
+        assertFailsWith<IllegalArgumentException> {
+            MediaPickerConfig(compressionQuality = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MediaPickerConfig(compressionQuality = 101)
+        }
+    }
+
+    @Test
+    fun testConfigValidation_rejectsInvalidDimensions() {
+        assertFailsWith<IllegalArgumentException> {
+            MediaPickerConfig(maxImageWidth = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            MediaPickerConfig(maxImageHeight = -10)
+        }
+    }
+
+    @Test
+    fun testConfig_compressionPropertiesAccepted() {
+        val config = MediaPickerConfig.single(
+            compressionQuality = 80,
+            maxImageWidth = 1920,
+            maxImageHeight = 1080
+        )
+        assertEquals(80, config.compressionQuality)
+        assertEquals(1920, config.maxImageWidth)
+        assertEquals(1080, config.maxImageHeight)
+    }
+
+    @Test
     fun testIsMimeTypeAllowed_wildcardsAndExactMatches() {
         val config = MediaPickerConfig(
             allowedMimeTypes = listOf("image$wildcard", "application/pdf")

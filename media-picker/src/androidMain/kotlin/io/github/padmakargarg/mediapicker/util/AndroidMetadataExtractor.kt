@@ -1,6 +1,7 @@
 package io.github.padmakargarg.mediapicker.util
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -81,6 +82,20 @@ object AndroidMetadataExtractor {
             else -> MediaType.UNKNOWN
         }
 
+        // If name has no extension or is purely a numeric ID (e.g. from PhotoPicker), append extension
+        if (!name.isNullOrBlank() && !name.contains('.') && !resolvedExtension.isNullOrBlank()) {
+            name = "${mediaType.name.lowercase()}_$name.$resolvedExtension"
+        }
+
+        // Fallback name if still blank
+        if (name.isNullOrBlank()) {
+            val prefix = if (mediaType != MediaType.UNKNOWN) mediaType.name.lowercase() else "media"
+            val ext = resolvedExtension ?: "bin"
+            name = "${prefix}_${id.take(8)}.$ext"
+        }
+
+        val sanitizedName = sanitizeFileName(name, resolvedExtension)
+
         // 4. Dimensions & Duration extraction (if extractMetadata is enabled)
         var width: Int? = null
         var height: Int? = null
@@ -116,15 +131,48 @@ object AndroidMetadataExtractor {
             }
         }
 
-        // 5. Copy to Cache if requested
+        // 5. Compression or Cache Copy
         var localPath: String? = null
-        if (config.copyToCache) {
-            localPath = copyUriToCache(context, uri, name ?: "media_$id.${resolvedExtension ?: "bin"}")
+        val isCompressionRequested = mediaType == MediaType.IMAGE &&
+            (config.compressionQuality != null || config.maxImageWidth != null || config.maxImageHeight != null)
+
+        val finalName = if (isCompressionRequested && !sanitizedName.endsWith(".jpg", ignoreCase = true)) {
+            "${sanitizedName.substringBeforeLast('.')}.jpg"
+        } else {
+            sanitizedName
+        }
+
+        if (isCompressionRequested) {
+            val cacheFolder = File(context.cacheDir, "media_picker_cache").apply { if (!exists()) mkdirs() }
+            val compressedFile = File(cacheFolder, "compressed_$finalName")
+            if (compressedFile.canonicalPath.startsWith(cacheFolder.canonicalPath)) {
+                val success = compressImage(
+                    context = context,
+                    sourceUri = uri,
+                    targetFile = compressedFile,
+                    quality = config.compressionQuality ?: 80,
+                    maxWidth = config.maxImageWidth,
+                    maxHeight = config.maxImageHeight
+                )
+                if (success) {
+                    localPath = compressedFile.absolutePath
+                    sizeInBytes = compressedFile.length()
+                    mimeType = "image/jpeg"
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(compressedFile.absolutePath, bounds)
+                    if (bounds.outWidth > 0 && bounds.outHeight > 0) {
+                        width = bounds.outWidth
+                        height = bounds.outHeight
+                    }
+                }
+            }
+        } else if (config.copyToCache) {
+            localPath = copyUriToCache(context, uri, finalName)
         }
 
         return MediaPickerItem(
             id = id,
-            name = name,
+            name = finalName,
             mimeType = mimeType,
             extension = resolvedExtension,
             sizeInBytes = sizeInBytes,
@@ -135,6 +183,70 @@ object AndroidMetadataExtractor {
             height = height,
             durationMs = durationMs
         )
+    }
+
+    internal fun compressImage(
+        context: Context,
+        sourceUri: Uri,
+        targetFile: File,
+        quality: Int = 80,
+        maxWidth: Int? = null,
+        maxHeight: Int? = null
+    ): Boolean {
+        return try {
+            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(sourceUri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, options)
+            }
+            if (options.outWidth <= 0 || options.outHeight <= 0) return false
+
+            var sampleSize = 1
+            if (maxWidth != null && maxHeight != null) {
+                while (options.outWidth / (sampleSize * 2) >= maxWidth &&
+                    options.outHeight / (sampleSize * 2) >= maxHeight
+                ) {
+                    sampleSize *= 2
+                }
+            } else if (maxWidth != null) {
+                while (options.outWidth / (sampleSize * 2) >= maxWidth) {
+                    sampleSize *= 2
+                }
+            } else if (maxHeight != null) {
+                while (options.outHeight / (sampleSize * 2) >= maxHeight) {
+                    sampleSize *= 2
+                }
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+            val bitmap = context.contentResolver.openInputStream(sourceUri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, decodeOptions)
+            } ?: return false
+
+            val scaledBitmap = if ((maxWidth != null && bitmap.width > maxWidth) ||
+                (maxHeight != null && bitmap.height > maxHeight)
+            ) {
+                val ratio = minOf(
+                    maxWidth?.toFloat()?.div(bitmap.width) ?: 1f,
+                    maxHeight?.toFloat()?.div(bitmap.height) ?: 1f
+                )
+                val targetW = (bitmap.width * ratio).toInt().coerceAtLeast(1)
+                val targetH = (bitmap.height * ratio).toInt().coerceAtLeast(1)
+                Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
+            } else {
+                bitmap
+            }
+
+            FileOutputStream(targetFile).use { out ->
+                scaledBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), out)
+            }
+            if (scaledBitmap != bitmap) {
+                scaledBitmap.recycle()
+            }
+            bitmap.recycle()
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     internal fun sanitizeFileName(rawName: String?, fallbackExtension: String? = null): String {

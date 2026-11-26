@@ -392,8 +392,26 @@ val config = MediaPickerConfig(
     maxSelection = 10,                          // Maximum items for multiple selection
     allowedMimeTypes = listOf("image/jpeg", "image/png"), // Filter MIME types
     maxFileSizeBytes = 10 * 1024 * 1024L,       // 10 MB limit per file
-    copyToCache = true                          // Copy to app-private cache directory
+    copyToCache = true,                         // Copy to app-private cache directory
+    extractMetadata = true,                     // Extract dimensions and duration
+    compressionQuality = 75,                    // Image quality (1-100)
+    maxImageWidth = 1920,                       // Downscale width if exceeded
+    maxImageHeight = 1080                       // Downscale height if exceeded
 )
+```
+
+### Image Compression & Resizing
+Set `compressionQuality` (1 to 100), `maxImageWidth`, and `maxImageHeight` to automatically compress high-resolution camera or gallery images down to lightweight JPEG files with optimized dimensions without running out of memory.
+
+```kotlin
+// Example: Compress picked image to 70% quality, max 1080px
+val compressedConfig = MediaPickerConfig.single(
+    copyToCache = true,
+    compressionQuality = 70,
+    maxImageWidth = 1080,
+    maxImageHeight = 1080
+)
+val result = picker.pickImage(compressedConfig)
 ```
 
 ### MIME Type Normalization
