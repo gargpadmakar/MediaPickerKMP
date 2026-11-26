@@ -2,9 +2,7 @@ package io.github.padmakargarg.mediapicker
 
 import io.github.padmakargarg.mediapicker.domain.model.*
 import io.github.padmakargarg.mediapicker.domain.repository.MediaPickerRepository
-import io.github.padmakargarg.mediapicker.domain.usecase.MediaPickerValidator
-import io.github.padmakargarg.mediapicker.domain.usecase.PickImageUseCase
-import io.github.padmakargarg.mediapicker.domain.usecase.PickMultipleImagesUseCase
+import io.github.padmakargarg.mediapicker.domain.usecase.*
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -108,6 +106,85 @@ class MediaPickerUseCaseTest {
     }
 
     @Test
+    fun testPickAudioUseCase_forcesSingleSelection() = runTest {
+        val repo = FakeMediaPickerRepository(
+            returnResult = MediaPickerResult.Success(
+                listOf(
+                    MediaPickerItem(
+                        id = "audio_1",
+                        name = "song.mp3",
+                        mimeType = "audio/mpeg",
+                        uri = "uri://audio1",
+                        mediaType = MediaType.AUDIO,
+                        durationMs = 180000L
+                    )
+                )
+            )
+        )
+        val useCase = PickAudioUseCase(repo)
+        val result = useCase(MediaPickerConfig.multiple(maxSelection = 5))
+
+        assertIs<MediaPickerResult.Success>(result)
+        assertEquals(false, repo.lastConfig?.allowMultiple)
+        assertEquals(1, repo.lastConfig?.maxSelection)
+        val item = result.items.first()
+        assertEquals(MediaType.AUDIO, item.mediaType)
+        assertEquals("audio/mpeg", item.mimeType)
+        assertEquals(180000L, item.durationMs)
+    }
+
+    @Test
+    fun testPickMultipleAudioUseCase_enforcesSelectionLimit() = runTest {
+        val repo = FakeMediaPickerRepository(
+            returnResult = MediaPickerResult.Success(
+                listOf(
+                    MediaPickerItem(id = "a1", uri = "uri://a1", mediaType = MediaType.AUDIO),
+                    MediaPickerItem(id = "a2", uri = "uri://a2", mediaType = MediaType.AUDIO),
+                    MediaPickerItem(id = "a3", uri = "uri://a3", mediaType = MediaType.AUDIO),
+                    MediaPickerItem(id = "a4", uri = "uri://a4", mediaType = MediaType.AUDIO)
+                )
+            )
+        )
+        val useCase = PickMultipleAudioUseCase(repo)
+        val result = useCase(MediaPickerConfig.multiple(maxSelection = 3))
+
+        assertIs<MediaPickerResult.Error>(result)
+        val error = result.error
+        assertIs<MediaPickerError.SelectionLimitExceeded>(error)
+        assertEquals(4, error.requested)
+        assertEquals(3, error.maxAllowed)
+    }
+
+    @Test
+    fun testCapturePhotoUseCase_validatesCapturedResult() = runTest {
+        val repo = FakeMediaPickerRepository(
+            returnResult = MediaPickerResult.Success(
+                listOf(
+                    MediaPickerItem(
+                        id = "cam_1",
+                        name = "photo_123.jpg",
+                        mimeType = "image/jpeg",
+                        uri = "content://mediapicker/camera_photos/photo_123.jpg",
+                        mediaType = MediaType.IMAGE,
+                        sizeInBytes = 204800L,
+                        width = 1920,
+                        height = 1080
+                    )
+                )
+            )
+        )
+        val useCase = CapturePhotoUseCase(repo)
+        val result = useCase(MediaPickerConfig.DEFAULT)
+
+        assertIs<MediaPickerResult.Success>(result)
+        assertEquals(false, repo.lastConfig?.allowMultiple)
+        val item = result.items.first()
+        assertEquals("image/jpeg", item.mimeType)
+        assertEquals(1920, item.width)
+        assertEquals(1080, item.height)
+    }
+
+    @Test
     fun testValidator_enforcesFileSizeLimits() {
         val oversizedItem = MediaPickerItem(
             id = "1",
@@ -142,6 +219,21 @@ class MediaPickerUseCaseTest {
         val error = validated.error
         assertIs<MediaPickerError.UnsupportedType>(error)
         assertEquals("application/zip", error.mimeType)
+    }
+
+    @Test
+    fun testValidator_enforcesAudioMimeTypes() {
+        val validAudio = MediaPickerItem(
+            id = "audio_1",
+            uri = "uri://audio1",
+            mimeType = "audio/mpeg"
+        )
+        val result = MediaPickerResult.Success(listOf(validAudio))
+        val config = MediaPickerConfig(allowedMimeTypes = listOf("audio$wildcard"))
+
+        val validated = MediaPickerValidator.validateResult(result, config)
+
+        assertIs<MediaPickerResult.Success>(validated)
     }
 
     @Test
