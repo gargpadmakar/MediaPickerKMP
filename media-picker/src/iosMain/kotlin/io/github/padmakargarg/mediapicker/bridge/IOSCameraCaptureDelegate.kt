@@ -5,6 +5,7 @@ import io.github.padmakargarg.mediapicker.domain.model.MediaPickerError
 import io.github.padmakargarg.mediapicker.domain.model.MediaPickerItem
 import io.github.padmakargarg.mediapicker.domain.model.MediaPickerResult
 import io.github.padmakargarg.mediapicker.domain.model.MediaType
+import io.github.padmakargarg.mediapicker.util.IOSMetadataExtractor
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.CancellableContinuation
@@ -22,12 +23,44 @@ private const val CAMERA_CACHE_FOLDER = "mediapicker_camera"
 class IOSCameraCaptureDelegate(
     private val continuation: CancellableContinuation<MediaPickerResult>,
     private val config: MediaPickerConfig,
+    private val captureMode: MediaType = MediaType.IMAGE,
     private val onComplete: () -> Unit = {}
 ) : NSObject(), UIImagePickerControllerDelegateProtocol, UINavigationControllerDelegateProtocol {
 
     override fun imagePickerController(picker: UIImagePickerController, didFinishPickingMediaWithInfo: Map<Any?, *>) {
         picker.dismissViewControllerAnimated(flag = true, completion = null)
         onComplete()
+
+        if (captureMode == MediaType.VIDEO) {
+            val videoUrl = didFinishPickingMediaWithInfo[UIImagePickerControllerMediaURL] as? NSURL
+            if (videoUrl == null) {
+                if (continuation.isActive) {
+                    continuation.resume(
+                        MediaPickerResult.Error(MediaPickerError.FileNotFound("Captured video data could not be retrieved."))
+                    )
+                }
+                return
+            }
+
+            try {
+                val item = IOSMetadataExtractor.extractItem(
+                    url = videoUrl,
+                    config = config,
+                    defaultMediaType = MediaType.VIDEO,
+                    forceCacheCopy = true
+                )
+                if (continuation.isActive) {
+                    continuation.resume(MediaPickerResult.Success(listOf(item)))
+                }
+            } catch (e: Exception) {
+                if (continuation.isActive) {
+                    continuation.resume(
+                        MediaPickerResult.Error(MediaPickerError.OperationFailed(message = "Failed to process captured video: ${e.message}"))
+                    )
+                }
+            }
+            return
+        }
 
         val image = didFinishPickingMediaWithInfo[UIImagePickerControllerOriginalImage] as? UIImage
         if (image == null) {

@@ -45,6 +45,11 @@ interface MediaPicker {
     suspend fun capturePhoto(config: MediaPickerConfig = MediaPickerConfig.DEFAULT): MediaPickerResult
 
     /**
+     * Captures a video using the device camera.
+     */
+    suspend fun captureVideo(config: MediaPickerConfig = MediaPickerConfig.DEFAULT): MediaPickerResult
+
+    /**
      * Picks a single file or document.
      */
     suspend fun pickFile(config: MediaPickerConfig = MediaPickerConfig.DEFAULT): MediaPickerResult

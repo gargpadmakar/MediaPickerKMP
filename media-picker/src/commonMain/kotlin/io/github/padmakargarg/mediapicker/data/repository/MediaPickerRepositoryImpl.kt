@@ -17,6 +17,7 @@ class MediaPickerRepositoryImpl(
     override suspend fun pickMultipleVideos(config: MediaPickerConfig): MediaPickerResult = bridge.pickMultipleVideos(config)
     override suspend fun pickMedia(config: MediaPickerConfig): MediaPickerResult = bridge.pickMedia(config)
     override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult = bridge.capturePhoto(config)
+    override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult = bridge.captureVideo(config)
     override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult = bridge.pickFile(config)
     override suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult = bridge.pickMultipleFiles(config)
     override suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult = bridge.pickAudio(config)

@@ -11,10 +11,7 @@ import platform.AVFoundation.*
 import platform.PhotosUI.PHPickerConfiguration
 import platform.PhotosUI.PHPickerFilter
 import platform.PhotosUI.PHPickerViewController
-import platform.UIKit.UIDocumentPickerViewController
-import platform.UIKit.UIImagePickerController
-import platform.UIKit.UIImagePickerControllerSourceType
-import platform.UIKit.UIViewController
+import platform.UIKit.*
 import kotlin.coroutines.resume
 
 /**
@@ -95,6 +92,17 @@ class IOSMediaPickerBridge(
     }
 
     override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult {
+        return launchCameraCapture(config = config, captureMode = MediaType.IMAGE)
+    }
+
+    override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult {
+        return launchCameraCapture(config = config, captureMode = MediaType.VIDEO)
+    }
+
+    private suspend fun launchCameraCapture(
+        config: MediaPickerConfig,
+        captureMode: MediaType
+    ): MediaPickerResult {
         val isCameraAvailable = UIImagePickerController.isSourceTypeAvailable(
             UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
         )
@@ -144,11 +152,16 @@ class IOSMediaPickerBridge(
 
             val cameraController = UIImagePickerController().apply {
                 sourceType = UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera
+                if (captureMode == MediaType.VIDEO) {
+                    mediaTypes = listOf("public.movie")
+                    cameraCaptureMode = UIImagePickerControllerCameraCaptureMode.UIImagePickerControllerCameraCaptureModeVideo
+                }
             }
 
             val delegate = IOSCameraCaptureDelegate(
                 continuation = continuation,
                 config = config,
+                captureMode = captureMode,
                 onComplete = { activeCameraDelegate = null }
             )
             activeCameraDelegate = delegate

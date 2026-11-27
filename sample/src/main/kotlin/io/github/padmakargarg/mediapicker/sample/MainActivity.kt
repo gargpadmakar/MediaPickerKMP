@@ -51,6 +51,11 @@ class MainActivity : ComponentActivity() {
                             subtitle = "Take a high-res photo using camera"
                         ) { state.capturePhoto(MediaPickerConfig.single()) },
                         MediaPickerActionItem(
+                            id = "camera_video",
+                            title = "Record Video",
+                            subtitle = "Record a video using camera"
+                        ) { state.captureVideo(MediaPickerConfig.single()) },
+                        MediaPickerActionItem(
                             id = "compressed_image",
                             title = "Compressed Image (70%)",
                             subtitle = "Compresses to 70% quality, max 1080px"
@@ -272,14 +277,36 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
-                                    Text("Camera", maxLines = 1)
+                                    Text("Photo Camera", maxLines = 1)
                                 }
+                                FilledTonalButton(
+                                    onClick = { state.captureVideo() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Record Video", maxLines = 1)
+                                }
+                            }
+                        }
+
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                                 FilledTonalButton(
                                     onClick = { state.pickImage() },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp)
                                 ) {
                                     Text("Image (1)", maxLines = 1)
+                                }
+                                FilledTonalButton(
+                                    onClick = { state.pickVideo() },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Video (1)", maxLines = 1)
                                 }
                             }
                         }

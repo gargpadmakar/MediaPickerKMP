@@ -25,6 +25,7 @@ class MediaPickerStateTest {
         override suspend fun pickMultipleVideos(config: MediaPickerConfig): MediaPickerResult = resultToReturn
         override suspend fun pickMedia(config: MediaPickerConfig): MediaPickerResult = resultToReturn
         override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult = resultToReturn
+        override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult = resultToReturn
         override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult = resultToReturn
         override suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult = resultToReturn
         override suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult = resultToReturn
@@ -106,5 +107,29 @@ class MediaPickerStateTest {
         assertEquals(MediaPickerUiState.Cancelled, state.uiState)
         state.clear()
         assertEquals(MediaPickerUiState.Idle, state.uiState)
+    }
+
+    @Test
+    fun testCaptureVideoUpdatesState() = runTest {
+        val fakePicker = FakeMediaPicker()
+        val sampleVideo = MediaPickerItem(
+            id = "v1",
+            name = "captured_video.mp4",
+            mimeType = "video/mp4",
+            extension = "mp4",
+            sizeInBytes = 5000000L,
+            mediaType = MediaType.VIDEO,
+            uri = "content://media/v1",
+            durationMs = 12000L
+        )
+        fakePicker.resultToReturn = MediaPickerResult.Success(listOf(sampleVideo))
+
+        val state = MediaPickerState(fakePicker, this)
+        state.captureVideo()
+        testScheduler.advanceUntilIdle()
+
+        assertIs<MediaPickerUiState.Success>(state.uiState)
+        assertEquals(listOf(sampleVideo), state.items)
+        assertFalse(state.isLoading)
     }
 }

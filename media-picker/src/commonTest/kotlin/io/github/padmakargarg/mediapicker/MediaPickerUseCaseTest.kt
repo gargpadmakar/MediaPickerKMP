@@ -50,6 +50,11 @@ class MediaPickerUseCaseTest {
             return returnResult
         }
 
+        override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult {
+            lastConfig = config
+            return returnResult
+        }
+
         override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult {
             lastConfig = config
             return returnResult
@@ -187,6 +192,37 @@ class MediaPickerUseCaseTest {
     }
 
     @Test
+    fun testCaptureVideoUseCase_validatesCapturedResult() = runTest {
+        val repo = FakeMediaPickerRepository(
+            returnResult = MediaPickerResult.Success(
+                listOf(
+                    MediaPickerItem(
+                        id = "vid_1",
+                        name = "video_123.mp4",
+                        mimeType = "video/mp4",
+                        uri = "content://mediapicker/camera_videos/video_123.mp4",
+                        mediaType = MediaType.VIDEO,
+                        sizeInBytes = 10485760L,
+                        width = 1920,
+                        height = 1080,
+                        durationMs = 15000L
+                    )
+                )
+            )
+        )
+        val useCase = CaptureVideoUseCase(repo)
+        val result = useCase(MediaPickerConfig.DEFAULT)
+
+        assertIs<MediaPickerResult.Success>(result)
+        assertEquals(false, repo.lastConfig?.allowMultiple)
+        val item = result.items.first()
+        assertEquals("video/mp4", item.mimeType)
+        assertEquals(15000L, item.durationMs)
+        assertEquals(1920, item.width)
+        assertEquals(1080, item.height)
+    }
+
+    @Test
     fun testValidator_enforcesFileSizeLimits() {
         val oversizedItem = MediaPickerItem(
             id = "1",
@@ -260,6 +296,7 @@ class MediaPickerUseCaseTest {
             override suspend fun pickMultipleVideos(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
             override suspend fun pickMedia(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
             override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
+            override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
             override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
             override suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled
             override suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult = MediaPickerResult.Cancelled

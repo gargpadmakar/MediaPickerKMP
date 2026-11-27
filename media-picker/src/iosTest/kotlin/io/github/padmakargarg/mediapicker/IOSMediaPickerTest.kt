@@ -87,5 +87,12 @@ class IOSMediaPickerTest {
             assertIs<MediaPickerError.CameraUnavailable>(captureResult.error)
             assertTrue(captureResult.error.message.contains("Camera hardware is not available"))
         }
+
+        val videoCaptureResult = picker.captureVideo(config)
+        if (!isCameraHardwareAvailable) {
+            assertIs<MediaPickerResult.Error>(videoCaptureResult)
+            assertIs<MediaPickerError.CameraUnavailable>(videoCaptureResult.error)
+            assertTrue(videoCaptureResult.error.message.contains("Camera hardware is not available"))
+        }
     }
 }

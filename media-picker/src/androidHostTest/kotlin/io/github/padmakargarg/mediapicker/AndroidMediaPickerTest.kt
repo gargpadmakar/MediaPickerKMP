@@ -48,6 +48,14 @@ class AndroidMediaPickerTest {
     }
 
     @Test
+    fun testAndroidMediaPicker_captureVideoWithoutActivityFailsGracefully() = runTest {
+        val picker = AndroidMediaPicker()
+        val result = picker.captureVideo(MediaPickerConfig.DEFAULT)
+        assertIs<MediaPickerResult.Error>(result)
+        assertIs<MediaPickerError.OperationFailed>(result.error)
+    }
+
+    @Test
     fun testAndroidMetadataExtractor_sanitizeFileName_pathTraversalStripped() {
         val unixTraversal = AndroidMetadataExtractor.sanitizeFileName("../../../evil.pdf")
         assertEquals("evil.pdf", unixTraversal)

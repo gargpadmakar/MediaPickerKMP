@@ -13,6 +13,7 @@ interface PlatformMediaPickerBridge {
     suspend fun pickMultipleVideos(config: MediaPickerConfig): MediaPickerResult
     suspend fun pickMedia(config: MediaPickerConfig): MediaPickerResult
     suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult
+    suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult
     suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult
     suspend fun pickMultipleFiles(config: MediaPickerConfig): MediaPickerResult
     suspend fun pickAudio(config: MediaPickerConfig): MediaPickerResult

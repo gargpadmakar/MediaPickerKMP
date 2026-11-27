@@ -51,6 +51,14 @@ class CapturePhotoUseCase(private val repository: MediaPickerRepository) {
     }
 }
 
+class CaptureVideoUseCase(private val repository: MediaPickerRepository) {
+    suspend operator fun invoke(config: MediaPickerConfig = MediaPickerConfig.DEFAULT): MediaPickerResult {
+        val effectiveConfig = config.copy(allowMultiple = false, maxSelection = 1)
+        val result = repository.captureVideo(effectiveConfig)
+        return MediaPickerValidator.validateResult(result, effectiveConfig)
+    }
+}
+
 class PickFileUseCase(private val repository: MediaPickerRepository) {
     suspend operator fun invoke(config: MediaPickerConfig = MediaPickerConfig.DEFAULT): MediaPickerResult {
         val effectiveConfig = config.copy(allowMultiple = false, maxSelection = 1)

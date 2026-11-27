@@ -55,6 +55,9 @@ class AndroidMediaPicker(
     override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult =
         delegate.capturePhoto(config)
 
+    override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult =
+        delegate.captureVideo(config)
+
     override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult =
         delegate.pickFile(config)
 

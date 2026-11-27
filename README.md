@@ -12,7 +12,7 @@ MediaPickerKMP is a unified, lifecycle-safe media and file picker for **Android*
 - **Videos**: Single and multiple video selection with duration and dimension extraction.
 - **Audio Files**: Single and multiple audio selection with duration extraction using native frameworks.
 - **Documents & Files**: PDF, DOCX, TXT, and custom MIME types with security-scoped resource handling on iOS.
-- **Camera Capture**: Integrated camera photo capture using Android `FileProvider` and iOS `UIImagePickerController`.
+- **Camera Capture**: Integrated camera photo and video capture using Android `FileProvider` and iOS `UIImagePickerController`.
 - **Compose Multiplatform**: `rememberMediaPicker()` and `rememberMediaPickerState()` composables, with ready-to-use Material 3 BottomSheets and Dialogs.
 - **Security-Hardened**: Built-in path traversal defense, canonical path containment checks, and robust MIME type normalization.
 - **Memory Efficient**: Streaming copy-to-cache pipeline prevents OutOfMemory errors on large assets.
@@ -42,6 +42,7 @@ MediaPickerKMP is a unified, lifecycle-safe media and file picker for **Android*
 | Multiple Audio | Yes | Yes | Supports MP3, WAV, AAC, FLAC, etc. |
 | Documents | Yes | Yes | Custom MIME / UTType filtering |
 | Camera Photo Capture | Yes | Yes | Requires camera hardware |
+| Camera Video Capture | Yes | Yes | High-res recording with metadata |
 | Copy to Cache | Yes | Yes | App-private storage |
 | Max File Size Filter | Yes | Yes | Client-side validation |
 
@@ -365,6 +366,16 @@ val docResult = picker.pickDocument(
 val photoResult = picker.capturePhoto()
 if (photoResult is MediaPickerResult.Success) {
     println("Captured photo at: ${photoResult.data.localPath}")
+}
+```
+
+### Camera Video Capture
+
+```kotlin
+val videoResult = picker.captureVideo()
+if (videoResult is MediaPickerResult.Success) {
+    val video = videoResult.data
+    println("Captured video at: ${video.localPath}, duration: ${video.durationMs}ms")
 }
 ```
 

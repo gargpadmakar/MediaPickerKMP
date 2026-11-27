@@ -91,6 +91,9 @@ class MediaPickerState(
     fun capturePhoto(config: MediaPickerConfig = MediaPickerConfig.DEFAULT) =
         execute { mediaPicker.capturePhoto(config) }
 
+    fun captureVideo(config: MediaPickerConfig = MediaPickerConfig.DEFAULT) =
+        execute { mediaPicker.captureVideo(config) }
+
     fun pickFile(config: MediaPickerConfig = MediaPickerConfig.DEFAULT) =
         execute { mediaPicker.pickFile(config) }
 

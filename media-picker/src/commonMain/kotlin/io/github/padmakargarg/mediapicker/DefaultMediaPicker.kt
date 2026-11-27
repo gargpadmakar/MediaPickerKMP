@@ -24,6 +24,7 @@ class DefaultMediaPicker(
     private val pickMultipleVideosUseCase = PickMultipleVideosUseCase(repository)
     private val pickMediaUseCase = PickMediaUseCase(repository)
     private val capturePhotoUseCase = CapturePhotoUseCase(repository)
+    private val captureVideoUseCase = CaptureVideoUseCase(repository)
     private val pickFileUseCase = PickFileUseCase(repository)
     private val pickMultipleFilesUseCase = PickMultipleFilesUseCase(repository)
     private val pickAudioUseCase = PickAudioUseCase(repository)
@@ -69,6 +70,9 @@ class DefaultMediaPicker(
 
     override suspend fun capturePhoto(config: MediaPickerConfig): MediaPickerResult =
         executeGuarded { capturePhotoUseCase(config) }
+
+    override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult =
+        executeGuarded { captureVideoUseCase(config) }
 
     override suspend fun pickFile(config: MediaPickerConfig): MediaPickerResult =
         executeGuarded { pickFileUseCase(config) }

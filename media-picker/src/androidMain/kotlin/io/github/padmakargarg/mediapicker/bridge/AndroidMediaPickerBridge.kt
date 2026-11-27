@@ -354,6 +354,75 @@ class AndroidMediaPickerBridge(
         }
     }
 
+    override suspend fun captureVideo(config: MediaPickerConfig): MediaPickerResult {
+        val activity = launcherBridge.activity
+            ?: return MediaPickerResult.Error(MediaPickerError.OperationFailed(message = "Activity is not available."))
+
+        val packageManager = activity.packageManager
+        val hasCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
+        if (!hasCamera) {
+            return MediaPickerResult.Error(
+                MediaPickerError.CameraUnavailable("Device does not have camera hardware.")
+            )
+        }
+
+        val cameraDir = File(activity.cacheDir, "camera_videos").apply {
+            if (!exists()) mkdirs()
+        }
+        val fileName = "video_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}.mp4"
+        val videoFile = File(cameraDir, fileName)
+
+        val authority = "${activity.packageName}.mediapicker.fileprovider"
+        val videoUri = try {
+            FileProvider.getUriForFile(activity, authority, videoFile)
+        } catch (e: Exception) {
+            return MediaPickerResult.Error(
+                MediaPickerError.OperationFailed(
+                    cause = e,
+                    message = "Failed to create secure content URI with authority '$authority'."
+                )
+            )
+        }
+
+        val success = try {
+            launcherBridge.launchContract(ActivityResultContracts.CaptureVideo(), videoUri)
+        } catch (e: ActivityNotFoundException) {
+            if (videoFile.exists()) videoFile.delete()
+            return MediaPickerResult.Error(
+                MediaPickerError.CameraUnavailable("No camera application found to handle video capture.")
+            )
+        } catch (t: Throwable) {
+            if (videoFile.exists()) videoFile.delete()
+            return MediaPickerResult.Error(MediaPickerError.OperationFailed(cause = t))
+        }
+
+        return if (success == true) {
+            if (videoFile.exists() && videoFile.length() > 0) {
+                val item = AndroidMetadataExtractor.extractItem(
+                    context = activity,
+                    uri = videoUri,
+                    config = config,
+                    defaultMediaType = MediaType.VIDEO
+                ).copy(
+                    localPath = videoFile.absolutePath,
+                    name = fileName,
+                    extension = "mp4",
+                    mimeType = "video/mp4",
+                    sizeInBytes = videoFile.length()
+                )
+                MediaPickerResult.Success(listOf(item))
+            } else {
+                if (videoFile.exists()) videoFile.delete()
+                MediaPickerResult.Error(
+                    MediaPickerError.FileNotFound("Camera output video file was not created or is empty.")
+                )
+            }
+        } else {
+            if (videoFile.exists()) videoFile.delete()
+            MediaPickerResult.Cancelled
+        }
+    }
+
     private fun tryPersistUriPermission(activity: ComponentActivity, uri: Uri) {
         try {
             activity.contentResolver.takePersistableUriPermission(
