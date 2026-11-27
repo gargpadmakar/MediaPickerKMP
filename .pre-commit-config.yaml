@@ -1,0 +1,77 @@
+# Pre-Commit Configuration for MediaPickerKMP
+# See https://pre-commit.com for more information
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+fail_fast: false
+
+repos:
+  # =========================================================================
+  # 1. FILE HYGIENE & GENERAL VALIDATION
+  # =========================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim Trailing Whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+        name: Fix End of File Newlines
+      - id: check-yaml
+        name: Validate YAML Syntax
+        args: [--safe]
+        exclude: '^\.github/workflows/.*'
+      - id: check-json
+        name: Validate JSON Syntax
+      - id: check-merge-conflict
+        name: Check for Merge Conflict Markers
+      - id: check-added-large-files
+        name: Prevent Committing Large Files
+        args: ['--maxkb=1024']
+      - id: check-case-conflict
+        name: Check for Filename Case Conflicts
+
+  # =========================================================================
+  # 2. PROHIBITED SENSITIVE & BUILD ARTIFACTS
+  # =========================================================================
+  - repo: local
+    hooks:
+      - id: block-sensitive-artifacts
+        name: Block Prohibited Artifacts (.jks, .keystore, .apk, .hprof, etc.)
+        entry: '(?i)\.(jks|keystore|p12|pfx|hprof|apk|aab|hprof)$|(^|/)local\.properties$'
+        language: pygrep
+        types: [file]
+
+  # =========================================================================
+  # 3. SECRET DETECTION (GITLEAKS)
+  # =========================================================================
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.0
+    hooks:
+      - id: gitleaks
+        name: Gitleaks Secret Detection
+        args: ["--redact", "--verbose", "--config=.gitleaks.toml"]
+
+  # =========================================================================
+  # 4. KOTLIN FORMATTING & LINTING (KTLINT)
+  # =========================================================================
+  - repo: https://github.com/maciejwalkowiak/pre-commit-ktlint
+    rev: v0.2.0
+    hooks:
+      - id: ktlint
+        name: ktlint Kotlin Formatter & Validator
+        args: ["--editorconfig=.editorconfig", "--relative"]
+        types_or: [kotlin]
+
+  # =========================================================================
+  # 5. CONVENTIONAL COMMIT MESSAGE VALIDATION
+  # =========================================================================
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Conventional Commit Validation
+        stages: [commit-msg]
+        args: [
+          "feat", "fix", "docs", "style", "refactor",
+          "perf", "test", "build", "ci", "chore", "revert"
+        ]

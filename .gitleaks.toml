@@ -1,0 +1,23 @@
+# Gitleaks Configuration for MediaPickerKMP
+# Protects against accidental commits of secrets, API keys, credentials and tokens.
+title = "MediaPickerKMP Secret Detection Policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Repository-wide allowlist for safe mocks and build outputs"
+paths = [
+    '''(^|/)build/''',
+    '''(^|/)\.gradle/''',
+    '''(^|/)gradle/wrapper/''',
+    '''(^|/)docs/''',
+    '''(^|/)sample/src/main/res/''',
+]
+
+regexTarget = "match"
+regexes = [
+    '''(?i)test[a-zA-Z0-9_-]*key''',
+    '''(?i)mock[a-zA-Z0-9_-]*token''',
+    '''example_token_12345''',
+]
